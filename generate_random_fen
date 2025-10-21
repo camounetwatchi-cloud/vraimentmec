@@ -1,0 +1,99 @@
+import chess
+import chess.engine
+import random
+# ... (Gardez le reste des imports et la configuration)
+
+# NOUVELLE FONCTION DE GÉNÉRATION PLUS AGRESSIVE
+def generate_random_fen_aggressive(engine):
+    """
+    Génère une FEN en jouant des coups plus aléatoires 
+    pour créer des positions structurellement plus déséquilibrées.
+    """
+    board = chess.Board()
+    num_moves = random.randint(MIN_MOVES, MAX_MOVES)
+    
+    for i in range(num_moves):
+        if board.is_game_over():
+            break
+        
+        legal_moves = list(board.legal_moves)
+        if not legal_moves:
+            break
+            
+        # Demander à Stockfish le meilleur coup et les alternatives
+        # Nous allons analyser seulement à une petite profondeur (4) pour la rapidité
+        try:
+            analysis = engine.analyse(board, chess.engine.Limit(depth=4), multipv=3)
+            best_move = analysis[0]["pv"][0]
+            
+            # 20% de chance de choisir un coup aléatoire (non analysé)
+            # ou l'une des 3 meilleures variantes pour dévier de la théorie
+            if random.random() < 0.20:
+                # Choisir une alternative parmi les coups légaux
+                move = random.choice(legal_moves)
+            else:
+                # Choisir l'un des 3 meilleurs coups ou un coup aléatoire parmi les premiers 3
+                # Si multipv est 3, on peut prendre l'une des 3 lignes
+                move = analysis[random.randint(0, min(len(analysis)-1, 2))]["pv"][0]
+            
+            
+        except Exception:
+            # En cas d'erreur d'analyse (ou si on ne veut pas dépendre de l'analyse)
+            move = random.choice(legal_moves)
+
+        board.push(move)
+        
+    return board.fen()
+
+
+# --- NOUVEAU SCRIPT PRINCIPAL ---
+
+if __name__ == "__main__":
+    
+    fen_trouvee = False
+    tentatives = 0
+    
+    # Démarrer le moteur une seule fois pour la boucle
+    engine_for_generation = None
+    try:
+        engine_for_generation = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+    except FileNotFoundError:
+        print(f"Erreur: Fichier Stockfish non trouvé à l'emplacement: {STOCKFISH_PATH}")
+        exit()
+
+
+    print("--- Générateur de Scène d'Échecs Équilibrée (Mode Déséquilibré) ---")
+    print(f"Objectif : Évaluation entre {TARGET_MIN_CP/100:.2f} et {TARGET_MAX_CP/100:.2f} Pions.")
+    print("-" * 40)
+    
+    start_time = time.time()
+    
+    while not fen_trouvee and tentatives < MAX_ATTEMPTS:
+        tentatives += 1
+        
+        # 1. Génération utilisant la nouvelle fonction plus 'folle'
+        fen = generate_random_fen_aggressive(engine_for_generation)
+        
+        # 2. Évaluation (Utiliser la fonction qui démarre/arrête le moteur pour l'analyse approfondie)
+        # Note: L'analyse pour la génération est rapide (depth=4), l'analyse finale est à depth=16
+        evaluation_str, evaluation_cp = get_stockfish_evaluation(fen) 
+        
+        if evaluation_cp is not None and TARGET_MIN_CP <= evaluation_cp <= TARGET_MAX_CP:
+            # 3. Succès !
+            fen_trouvee = True
+            
+            print("\n✅ POSITION ÉQUILIBRÉE TROUVÉE !")
+            print(f"FEN : {fen}")
+            print(f"Tour au trait : {'Blanc' if chess.Board(fen).turn == chess.WHITE else 'Noir'}")
+            print(f"Évaluation Stockfish (dép. {STOCKFISH_DEPTH}) : {evaluation_str}")
+            print(f"Trouvé en {tentatives} tentatives (Temps écoulé : {time.time() - start_time:.2f}s)")
+            
+        else:
+            print(f"Tentative {tentatives}: Éval: {evaluation_str}. Retente...", end='\r')
+            
+    if not fen_trouvee:
+        print("\n\n❌ ÉCHEC : La position équilibrée n'a pas été trouvée après le nombre maximal de tentatives.")
+        
+    # Fermer le moteur utilisé pour la génération
+    if engine_for_generation:
+        engine_for_generation.quit()
