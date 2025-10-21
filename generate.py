@@ -21,7 +21,7 @@ TARGET_MAX_CP = 10
 MAX_ATTEMPTS = 1000 # Augmenté car les conditions sont plus strictes
 
 # NOUVEAU PARAMÈTRE : Différence matérielle minimale (en points)
-MIN_MATERIAL_DIFFERENCE = 3.0 
+MIN_MATERIAL_DIFFERENCE = 10.0 
 MATERIAL_VALUES = {
     chess.PAWN: 1,
     chess.KNIGHT: 3,
