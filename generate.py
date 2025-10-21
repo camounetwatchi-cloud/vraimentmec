@@ -6,18 +6,18 @@ import time
 import math
 
 # --- Configuration ---
-# Le chemin est construit RELATIVEMENT à la position du script (dans le dossier 'engine')
+# Le chemin est construit RELATIVEMENT à la position du script
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-windows-x86-64-avx2.exe")
 
 # Paramètres d'analyse
 STOCKFISH_DEPTH = 16 
 
-# PARAMÈTRES D'ÉVALUATION CIBLÉE
+# PARAMÈTRES D'ÉVALUATION CIBLÉE (Compensée)
 TARGET_MIN_CP = -10 # Cherche entre -0.10 et +0.10 pions
 TARGET_MAX_CP = 10  
 MAX_ATTEMPTS = 5000 
 
-# Déséquilibre Matériel Compensé
+# Déséquilibre Matériel Sévère
 MIN_MATERIAL_DIFFERENCE = 3.0 
 MIN_PIECE_DIFFERENCE = 1 
 
@@ -39,20 +39,19 @@ PIECES_TO_GENERATE = [
 # --- Fonctions de Génération Aléatoire et Légalité ---
 
 def generate_pure_random_fen():
-    """
-    Génère une FEN aléatoire en plaçant les pièces.
-    (Fonction inchangée)
-    """
-    board = chess.Board(None)
+    """Génère une FEN aléatoire en plaçant les pièces sur l'échiquier."""
+    board = chess.Board(None) # Plateau vide
+
+    # 1. Placer les Rois
     king_squares = random.sample(chess.SQUARES, 2)
     board.set_piece_at(king_squares[0], chess.Piece(chess.KING, chess.WHITE))
     board.set_piece_at(king_squares[1], chess.Piece(chess.KING, chess.BLACK))
 
+    # 2. Placer les autres pièces aléatoirement
     available_squares = list(set(chess.SQUARES) - set(king_squares))
     random.shuffle(available_squares)
     
     num_pieces_to_place = random.randint(10, len(PIECES_TO_GENERATE) * 2) 
-    
     pieces_to_place = random.sample(PIECES_TO_GENERATE * 2, num_pieces_to_place)
     
     white_turn = random.choice([True, False])
@@ -64,16 +63,18 @@ def generate_pure_random_fen():
         square = available_squares.pop()
         color = random.choice([chess.WHITE, chess.BLACK])
         
+        # Les pions ne doivent pas être sur la 1ère ou 8ème rangée
         if piece_type == chess.PAWN:
             if chess.square_rank(square) == 0 or chess.square_rank(square) == 7:
                 continue
 
         board.set_piece_at(square, chess.Piece(piece_type, color))
 
+    # 3. Finaliser la FEN
     fen_parts = board.fen().split(' ')
-    fen_parts[1] = 'w' if white_turn else 'b'
-    fen_parts[2] = '-' 
-    fen_parts[3] = '-' 
+    fen_parts[1] = 'w' if white_turn else 'b' # Le trait
+    fen_parts[2] = '-' # Droits de roque
+    fen_parts[3] = '-' # En passant
     fen_parts[4] = '0'
     fen_parts[5] = str(random.randint(10, 50))
 
@@ -81,17 +82,17 @@ def generate_pure_random_fen():
 
 
 def is_fen_legal(fen: str):
-    """Vérifie si une FEN est syntaxiquement et légalement valide ET qu'elle n'est pas en échec."""
+    """Vérifie si une FEN est valide et ne commence pas par un échec."""
     try:
         board = chess.Board(fen)
         
-        # 1. Vérification de la légalité de base (adjacence des rois, etc.)
+        # 1. Vérification de la légalité de base
         if not board.is_valid():
             return False, None
             
-        # 2. NOUVELLE VÉRIFICATION : Le côté qui doit jouer NE DOIT PAS être en échec.
+        # 2. Rejet des positions qui commencent par un échec
         if board.is_check():
-            return False, None # Rejette les positions qui commencent par un échec
+            return False, None
             
         return True, board
         
@@ -99,9 +100,10 @@ def is_fen_legal(fen: str):
         return False, None
 
 
-# --- Fonctions de Vérification Matérielle et d'Évaluation (Identiques) ---
+# --- Fonctions de Vérification Matérielle ---
 
 def calculate_material_value(board: chess.Board):
+    """Calcule la valeur matérielle totale pour chaque couleur."""
     white_material = 0
     black_material = 0
     for piece_type, value in MATERIAL_VALUES.items():
@@ -111,12 +113,15 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
+    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
+    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
+    
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
@@ -130,13 +135,34 @@ def check_piece_difference(board: chess.Board, min_piece_diff: int):
     return False
 
 
+# --- Fonction d'Évaluation Stockfish (avec détection de nulle) ---
+
 def get_stockfish_evaluation(fen: str):
+    """Obtient l'évaluation Stockfish et détecte une potentielle nulle forcée."""
     engine = None
     try:
         engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
         board = chess.Board(fen)
-        info = engine.analyse(board, chess.engine.Limit(depth=STOCKFISH_DEPTH))
-        score = info["score"].white() 
+        
+        # Analyser les 3 meilleurs coups pour la détection de nulle
+        info_list = engine.analyse(board, chess.engine.Limit(depth=STOCKFISH_DEPTH), multipv=3)
+        
+        # L'évaluation principale
+        info = info_list[0]
+        score = info["score"].white()
+        
+        # --- LOGIQUE DE VÉRIFICATION DE NULLE ---
+        # Si tous les 3 meilleurs coups sont évalués comme neutres (dans la marge de cible),
+        # on rejette la position car elle mène probablement à une nulle forcée ou passive.
+        null_count = 0
+        for item in info_list:
+            item_score = item["score"].white()
+            # Vérifie si c'est un Mat (is_mate) ou si c'est très proche de zéro
+            if not item_score.is_mate() and abs(item_score.cp) <= TARGET_MAX_CP: 
+                null_count += 1
+
+        is_forced_draw = (null_count == len(info_list))
+        # --- Fin de la vérification de Nulle ---
         
         if score.is_mate():
             evaluation_str = f"Mat en {score.mate()}"
@@ -145,10 +171,11 @@ def get_stockfish_evaluation(fen: str):
             evaluation_cp = score.cp
             evaluation_str = f"{evaluation_cp / 100.0:+.2f} Pions"
             
-        return evaluation_str, evaluation_cp
+        return evaluation_str, evaluation_cp, is_forced_draw
         
     except Exception as e:
-        return None, None
+        # En cas d'erreur Stockfish, on suppose qu'il y a un problème (nulle ou illégale)
+        return None, None, True 
     finally:
         if engine:
             engine.quit()
@@ -160,9 +187,9 @@ if __name__ == "__main__":
     fen_trouvee = False
     tentatives = 0
     
-    print("--- Générateur de Déséquilibre Matériel SÉVÈRE et Compensé (SANS ÉCHEC) ---")
-    print(f"Objectif : Évaluation {TARGET_MIN_CP/100:.2f} à {TARGET_MAX_CP/100:.2f}")
-    print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}) ET (PAS D'ÉCHEC INITIAL).")
+    print("--- Générateur de Déséquilibre Matériel SÉVÈRE et Compensé ---")
+    print(f"Objectif : Évaluation {TARGET_MIN_CP/100:.2f} à {TARGET_MAX_CP/100:.2f} (Pas de nulle forcée).")
+    print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}).")
     print("-" * 80)
     
     start_time = time.time()
@@ -177,7 +204,6 @@ if __name__ == "__main__":
         is_legal, board = is_fen_legal(fen)
         
         if not is_legal:
-            # Rejette si la position est illégale OU s'il y a échec au début
             print(f"Tentative {tentatives}: Illégale ou en Échec. Retente...", end='\r')
             continue
             
@@ -190,11 +216,16 @@ if __name__ == "__main__":
         # Si les deux conditions matérielles sont remplies...
         if is_compensated_mat and is_compensated_piece:
             
-            # 5. Évaluation Stockfish (lent)
-            evaluation_str, evaluation_cp = get_stockfish_evaluation(fen)
+            # 5. Évaluation Stockfish (lent) + détection de nulle
+            evaluation_str, evaluation_cp, is_forced_draw = get_stockfish_evaluation(fen)
+            
+            # Rejet si le jeu mène probablement à une nulle
+            if is_forced_draw:
+                print(f"Tentative {tentatives}: Éval OK, mais mène probablement à une nulle forcée. Retente...", end='\r')
+                continue
             
             if evaluation_cp is not None and TARGET_MIN_CP <= evaluation_cp <= TARGET_MAX_CP:
-                # 6. Succès ! Les quatre conditions sont remplies.
+                # 6. Succès ! Toutes les conditions sont remplies.
                 fen_trouvee = True
                 
                 print("\n✅ POSITION ALÉATOIRE COMPENSÉE TROUVÉE !")
