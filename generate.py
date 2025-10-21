@@ -13,13 +13,12 @@ STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-wi
 STOCKFISH_DEPTH = 16 
 
 # PARAMÈTRES D'ÉVALUATION CIBLÉE
-TARGET_MIN_CP = -10 
+TARGET_MIN_CP = -10 # Cherche entre -0.10 et +0.10 pions
 TARGET_MAX_CP = 10  
 MAX_ATTEMPTS = 5000 
 
 # Déséquilibre Matériel Compensé
 MIN_MATERIAL_DIFFERENCE = 3.0 
-# NOUVEAU CRITÈRE : Différence minimale de pièces majeures ou mineures (autre que pion)
 MIN_PIECE_DIFFERENCE = 1 
 
 MATERIAL_VALUES = {
@@ -30,28 +29,37 @@ MATERIAL_VALUES = {
     chess.QUEEN: 9,
 }
 
+# PIÈCES DISPONIBLES POUR LA GÉNÉRATION ALÉATOIRE (CORRIGÉ: Défini ici pour éviter la NameError)
+PIECES_TO_GENERATE = [
+    chess.ROOK, chess.ROOK, chess.KNIGHT, chess.KNIGHT, chess.BISHOP, chess.BISHOP, chess.QUEEN, 
+    chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN
+] 
 
-# --- Fonctions de Légalité et Matérielle (Mises à jour) ---
+
+# --- Fonctions de Génération Aléatoire et Légalité ---
 
 def generate_pure_random_fen():
     """
     Génère une FEN aléatoire en plaçant les pièces.
-    (La fonction est inchangée, elle reste la source de l'aléa).
     """
-    board = chess.Board(None)
+    board = chess.Board(None) # Commence avec un plateau vide
+
+    # 1. Placer les Rois (obligatoire pour la légalité)
     king_squares = random.sample(chess.SQUARES, 2)
     board.set_piece_at(king_squares[0], chess.Piece(chess.KING, chess.WHITE))
     board.set_piece_at(king_squares[1], chess.Piece(chess.KING, chess.BLACK))
 
+    # 2. Placer les autres pièces aléatoirement
     available_squares = list(set(chess.SQUARES) - set(king_squares))
     random.shuffle(available_squares)
     
     # On choisit aléatoirement combien de pièces placer (pour avoir des finales)
+    # L'erreur venait d'ici, maintenant PIECES_TO_GENERATE est bien défini globalement.
     num_pieces_to_place = random.randint(10, len(PIECES_TO_GENERATE) * 2) 
     
     pieces_to_place = random.sample(PIECES_TO_GENERATE * 2, num_pieces_to_place)
     
-    white_turn = random.choice([True, False])
+    white_turn = random.choice([True, False]) # Qui est au trait
     
     for piece_type in pieces_to_place:
         if not available_squares:
@@ -60,18 +68,20 @@ def generate_pure_random_fen():
         square = available_squares.pop()
         color = random.choice([chess.WHITE, chess.BLACK])
         
+        # Les pions ne doivent pas être sur la 1ère ou 8ème rangée
         if piece_type == chess.PAWN:
             if chess.square_rank(square) == 0 or chess.square_rank(square) == 7:
                 continue
 
         board.set_piece_at(square, chess.Piece(piece_type, color))
 
+    # 3. Finaliser la FEN
     fen_parts = board.fen().split(' ')
-    fen_parts[1] = 'w' if white_turn else 'b'
-    fen_parts[2] = '-' 
-    fen_parts[3] = '-' 
+    fen_parts[1] = 'w' if white_turn else 'b' # Le trait
+    fen_parts[2] = '-' # Simplification des droits de roque
+    fen_parts[3] = '-' # Simplification de l'en passant
     fen_parts[4] = '0'
-    fen_parts[5] = str(random.randint(10, 50))
+    fen_parts[5] = str(random.randint(10, 50)) # Numéro de coup
 
     return ' '.join(fen_parts)
 
@@ -86,6 +96,8 @@ def is_fen_legal(fen: str):
     except ValueError:
         return False, None
 
+
+# --- Fonctions de Vérification Matérielle et d'Évaluation (Identiques) ---
 
 def calculate_material_value(board: chess.Board):
     """Calcule la valeur matérielle totale pour chaque couleur."""
@@ -107,24 +119,21 @@ def is_material_compensated(board: chess.Board, min_diff: float):
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
     """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
     
-    # 1. Différence de pièces MAJEURES (Tour, Dame)
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
     
-    # 2. Différence de pièces MINEURES (Cavalier, Fou)
     white_minors = len(board.pieces(chess.KNIGHT, chess.WHITE)) + len(board.pieces(chess.BISHOP, chess.WHITE))
     black_minors = len(board.pieces(chess.KNIGHT, chess.BLACK)) + len(board.pieces(chess.BISHOP, chess.BLACK))
     minor_diff = abs(white_minors - black_minors)
     
-    # La condition est remplie si la différence de majeures OU la différence de mineures est suffisante
     if major_diff >= min_piece_diff or minor_diff >= min_piece_diff:
         return True
     return False
 
 
 def get_stockfish_evaluation(fen: str):
-    # ... (Garder cette fonction telle quelle)
+    """Obtient l'évaluation Stockfish pour une FEN donnée (analyse finale)."""
     engine = None
     try:
         engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
