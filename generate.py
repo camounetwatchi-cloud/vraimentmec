@@ -13,12 +13,15 @@ STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-wi
 STOCKFISH_DEPTH = 16 
 
 # PARAMÈTRES D'ÉVALUATION CIBLÉE
-TARGET_MIN_CP = -10 # Cherche entre -0.10 et +0.10 pions
+TARGET_MIN_CP = -10 
 TARGET_MAX_CP = 10  
-MAX_ATTEMPTS = 5000 # Augmenté car trouver une FEN légale ET égale est TRES difficile
+MAX_ATTEMPTS = 5000 
 
 # Déséquilibre Matériel Compensé
 MIN_MATERIAL_DIFFERENCE = 3.0 
+# NOUVEAU CRITÈRE : Différence minimale de pièces majeures ou mineures (autre que pion)
+MIN_PIECE_DIFFERENCE = 1 
+
 MATERIAL_VALUES = {
     chess.PAWN: 1,
     chess.KNIGHT: 3,
@@ -27,27 +30,19 @@ MATERIAL_VALUES = {
     chess.QUEEN: 9,
 }
 
-# Pièces disponibles pour la génération aléatoire
-PIECES_TO_GENERATE = [
-    chess.ROOK, chess.ROOK, chess.KNIGHT, chess.KNIGHT, chess.BISHOP, chess.BISHOP, chess.QUEEN, 
-    chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN
-] # Une liste de pièces (sans les Rois)
 
-# --- Nouvelles Fonctions de Génération Aléatoire et Légalité ---
+# --- Fonctions de Légalité et Matérielle (Mises à jour) ---
 
 def generate_pure_random_fen():
     """
     Génère une FEN aléatoire en plaçant les pièces.
-    Cette méthode est plus lente mais génère des positions plus variées.
+    (La fonction est inchangée, elle reste la source de l'aléa).
     """
-    board = chess.Board(None) # Commence avec un plateau vide
-
-    # 1. Placer les Rois (obligatoire pour la légalité)
+    board = chess.Board(None)
     king_squares = random.sample(chess.SQUARES, 2)
     board.set_piece_at(king_squares[0], chess.Piece(chess.KING, chess.WHITE))
     board.set_piece_at(king_squares[1], chess.Piece(chess.KING, chess.BLACK))
 
-    # 2. Placer les autres pièces aléatoirement
     available_squares = list(set(chess.SQUARES) - set(king_squares))
     random.shuffle(available_squares)
     
@@ -56,31 +51,27 @@ def generate_pure_random_fen():
     
     pieces_to_place = random.sample(PIECES_TO_GENERATE * 2, num_pieces_to_place)
     
-    white_turn = random.choice([True, False]) # Qui est au trait
+    white_turn = random.choice([True, False])
     
     for piece_type in pieces_to_place:
         if not available_squares:
             break
             
         square = available_squares.pop()
-        
-        # 50% de chance d'être blanc ou noir
         color = random.choice([chess.WHITE, chess.BLACK])
         
-        # Les pions ne doivent pas être sur la 1ère ou 8ème rangée
         if piece_type == chess.PAWN:
             if chess.square_rank(square) == 0 or chess.square_rank(square) == 7:
                 continue
 
         board.set_piece_at(square, chess.Piece(piece_type, color))
 
-    # 3. Finaliser la FEN
     fen_parts = board.fen().split(' ')
-    fen_parts[1] = 'w' if white_turn else 'b' # Le trait
-    fen_parts[2] = '-' # Simplification des droits de roque
-    fen_parts[3] = '-' # Simplification de l'en passant
+    fen_parts[1] = 'w' if white_turn else 'b'
+    fen_parts[2] = '-' 
+    fen_parts[3] = '-' 
     fen_parts[4] = '0'
-    fen_parts[5] = str(random.randint(10, 50)) # Numéro de coup
+    fen_parts[5] = str(random.randint(10, 50))
 
     return ' '.join(fen_parts)
 
@@ -89,24 +80,12 @@ def is_fen_legal(fen: str):
     """Vérifie si une FEN est syntaxiquement et légalement valide."""
     try:
         board = chess.Board(fen)
-        # La vérification la plus stricte : le côté qui n'est pas au trait NE DOIT PAS être en échec.
-        # Et le côté au trait ne doit pas avoir un roi déjà en échec (impossible d'avoir des rois adjacents).
-        
-        # Vérifions si le côté qui vient de jouer (celui qui n'est PAS au trait) a laissé son roi en échec.
-        # Si la couleur au trait (board.turn) est White, alors le Noir doit avoir joué
-        # Le FEN est illégal si le roi qui vient de jouer est en échec (impossible en vrai partie)
-        
-        # Test 1: La position est-elle légale selon python-chess? (checkmate, stalemate, etc. sont OK)
         if board.is_valid():
-            # Test 2: Le côté au trait peut-il capturer le roi adverse? (Vérification de la distance des rois)
-            # Cette vérification est implicite dans board.is_valid()
-            
             return True, board
         return False, None
     except ValueError:
         return False, None
 
-# --- Fonctions de Vérification Matérielle et d'Évaluation (Identiques) ---
 
 def calculate_material_value(board: chess.Board):
     """Calcule la valeur matérielle totale pour chaque couleur."""
@@ -119,14 +98,33 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
-    """Vérifie si la différence matérielle est supérieure ou égale au minimum requis."""
+    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
+def check_piece_difference(board: chess.Board, min_piece_diff: int):
+    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
+    
+    # 1. Différence de pièces MAJEURES (Tour, Dame)
+    white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
+    black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
+    major_diff = abs(white_majors - black_majors)
+    
+    # 2. Différence de pièces MINEURES (Cavalier, Fou)
+    white_minors = len(board.pieces(chess.KNIGHT, chess.WHITE)) + len(board.pieces(chess.BISHOP, chess.WHITE))
+    black_minors = len(board.pieces(chess.KNIGHT, chess.BLACK)) + len(board.pieces(chess.BISHOP, chess.BLACK))
+    minor_diff = abs(white_minors - black_minors)
+    
+    # La condition est remplie si la différence de majeures OU la différence de mineures est suffisante
+    if major_diff >= min_piece_diff or minor_diff >= min_piece_diff:
+        return True
+    return False
+
+
 def get_stockfish_evaluation(fen: str):
-    """Obtient l'évaluation Stockfish pour une FEN donnée (analyse finale)."""
+    # ... (Garder cette fonction telle quelle)
     engine = None
     try:
         engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
@@ -149,21 +147,20 @@ def get_stockfish_evaluation(fen: str):
         if engine:
             engine.quit()
 
-# --- Script Principal : Boucle de Filtrage Aléatoire ---
+# --- Script Principal : Boucle de Filtrage Strict ---
 
 if __name__ == "__main__":
     
     fen_trouvee = False
     tentatives = 0
     
-    print("--- Générateur de FEN Aléatoire Pure (Déséquilibre Matériel Compensé) ---")
-    print(f"Objectif : Évaluation {TARGET_MIN_CP/100:.2f} à {TARGET_MAX_CP/100:.2f} ET Différence Matérielle >= {MIN_MATERIAL_DIFFERENCE} points.")
+    print("--- Générateur de Déséquilibre Matériel SÉVÈRE et Compensé ---")
+    print(f"Objectif : Évaluation {TARGET_MIN_CP/100:.2f} à {TARGET_MAX_CP/100:.2f}")
+    print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}).")
     print("-" * 80)
     
     start_time = time.time()
     
-    # NOTE: L'ancienne fonction d'accélération n'est plus nécessaire car Stockfish n'est pas utilisé pour la génération.
-
     while not fen_trouvee and tentatives < MAX_ATTEMPTS:
         tentatives += 1
         
@@ -172,20 +169,24 @@ if __name__ == "__main__":
         
         # 2. Vérification de la Légalité Stricte
         is_legal, board = is_fen_legal(fen)
-        
         if not is_legal:
             print(f"Tentative {tentatives}: Illégale. Retente...", end='\r')
             continue
             
-        # 3. Vérification du Matériel
-        is_compensated, white_mat, black_mat = is_material_compensated(board, MIN_MATERIAL_DIFFERENCE)
+        # 3. VÉRIFICATION DU MATÉRIEL TOTAL
+        is_compensated_mat, white_mat, black_mat = is_material_compensated(board, MIN_MATERIAL_DIFFERENCE)
         
-        if is_compensated:
-            # 4. Évaluation Stockfish (lent) si le matériel est OK
+        # 4. VÉRIFICATION DE LA DIFFÉRENCE DE PIÈCES (pour éliminer les échanges parfaits)
+        is_compensated_piece = check_piece_difference(board, MIN_PIECE_DIFFERENCE)
+        
+        # Si les deux conditions matérielles sont remplies...
+        if is_compensated_mat and is_compensated_piece:
+            
+            # 5. Évaluation Stockfish (lent)
             evaluation_str, evaluation_cp = get_stockfish_evaluation(fen)
             
             if evaluation_cp is not None and TARGET_MIN_CP <= evaluation_cp <= TARGET_MAX_CP:
-                # 5. Succès ! Les trois conditions sont remplies.
+                # 6. Succès ! Les quatre conditions sont remplies.
                 fen_trouvee = True
                 
                 print("\n✅ POSITION ALÉATOIRE COMPENSÉE TROUVÉE !")
@@ -196,10 +197,11 @@ if __name__ == "__main__":
                 print(f"Trouvé en {tentatives} tentatives (Temps écoulé : {time.time() - start_time:.2f}s)")
                 
             else:
-                print(f"Tentative {tentatives}: Légal, Matériel OK ({abs(white_mat - black_mat)}), Éval: {evaluation_str}. Retente...", end='\r')
+                print(f"Tentative {tentatives}: Éval: {evaluation_str}. Retente...", end='\r')
         
         else:
-            print(f"Tentative {tentatives}: Légal, Matériel insuffisant ({abs(white_mat - black_mat)}). Retente...", end='\r')
+            # Matériel ou différence de pièces insuffisante
+            print(f"Tentative {tentatives}: Matériel insuffisant. Diff. Mat: {abs(white_mat - black_mat)}. Retente...", end='\r')
             
     if not fen_trouvee:
         print("\n\n❌ ÉCHEC : La position n'a pas été trouvée après le nombre maximal de tentatives.")
