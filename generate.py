@@ -29,7 +29,7 @@ MATERIAL_VALUES = {
     chess.QUEEN: 9,
 }
 
-# PIÈCES DISPONIBLES POUR LA GÉNÉRATION ALÉATOIRE (CORRIGÉ: Défini ici pour éviter la NameError)
+# PIÈCES DISPONIBLES POUR LA GÉNÉRATION ALÉATOIRE
 PIECES_TO_GENERATE = [
     chess.ROOK, chess.ROOK, chess.KNIGHT, chess.KNIGHT, chess.BISHOP, chess.BISHOP, chess.QUEEN, 
     chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN
@@ -41,25 +41,21 @@ PIECES_TO_GENERATE = [
 def generate_pure_random_fen():
     """
     Génère une FEN aléatoire en plaçant les pièces.
+    (Fonction inchangée)
     """
-    board = chess.Board(None) # Commence avec un plateau vide
-
-    # 1. Placer les Rois (obligatoire pour la légalité)
+    board = chess.Board(None)
     king_squares = random.sample(chess.SQUARES, 2)
     board.set_piece_at(king_squares[0], chess.Piece(chess.KING, chess.WHITE))
     board.set_piece_at(king_squares[1], chess.Piece(chess.KING, chess.BLACK))
 
-    # 2. Placer les autres pièces aléatoirement
     available_squares = list(set(chess.SQUARES) - set(king_squares))
     random.shuffle(available_squares)
     
-    # On choisit aléatoirement combien de pièces placer (pour avoir des finales)
-    # L'erreur venait d'ici, maintenant PIECES_TO_GENERATE est bien défini globalement.
     num_pieces_to_place = random.randint(10, len(PIECES_TO_GENERATE) * 2) 
     
     pieces_to_place = random.sample(PIECES_TO_GENERATE * 2, num_pieces_to_place)
     
-    white_turn = random.choice([True, False]) # Qui est au trait
+    white_turn = random.choice([True, False])
     
     for piece_type in pieces_to_place:
         if not available_squares:
@@ -68,31 +64,37 @@ def generate_pure_random_fen():
         square = available_squares.pop()
         color = random.choice([chess.WHITE, chess.BLACK])
         
-        # Les pions ne doivent pas être sur la 1ère ou 8ème rangée
         if piece_type == chess.PAWN:
             if chess.square_rank(square) == 0 or chess.square_rank(square) == 7:
                 continue
 
         board.set_piece_at(square, chess.Piece(piece_type, color))
 
-    # 3. Finaliser la FEN
     fen_parts = board.fen().split(' ')
-    fen_parts[1] = 'w' if white_turn else 'b' # Le trait
-    fen_parts[2] = '-' # Simplification des droits de roque
-    fen_parts[3] = '-' # Simplification de l'en passant
+    fen_parts[1] = 'w' if white_turn else 'b'
+    fen_parts[2] = '-' 
+    fen_parts[3] = '-' 
     fen_parts[4] = '0'
-    fen_parts[5] = str(random.randint(10, 50)) # Numéro de coup
+    fen_parts[5] = str(random.randint(10, 50))
 
     return ' '.join(fen_parts)
 
 
 def is_fen_legal(fen: str):
-    """Vérifie si une FEN est syntaxiquement et légalement valide."""
+    """Vérifie si une FEN est syntaxiquement et légalement valide ET qu'elle n'est pas en échec."""
     try:
         board = chess.Board(fen)
-        if board.is_valid():
-            return True, board
-        return False, None
+        
+        # 1. Vérification de la légalité de base (adjacence des rois, etc.)
+        if not board.is_valid():
+            return False, None
+            
+        # 2. NOUVELLE VÉRIFICATION : Le côté qui doit jouer NE DOIT PAS être en échec.
+        if board.is_check():
+            return False, None # Rejette les positions qui commencent par un échec
+            
+        return True, board
+        
     except ValueError:
         return False, None
 
@@ -100,7 +102,6 @@ def is_fen_legal(fen: str):
 # --- Fonctions de Vérification Matérielle et d'Évaluation (Identiques) ---
 
 def calculate_material_value(board: chess.Board):
-    """Calcule la valeur matérielle totale pour chaque couleur."""
     white_material = 0
     black_material = 0
     for piece_type, value in MATERIAL_VALUES.items():
@@ -110,15 +111,12 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
-    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
-    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
-    
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
@@ -133,7 +131,6 @@ def check_piece_difference(board: chess.Board, min_piece_diff: int):
 
 
 def get_stockfish_evaluation(fen: str):
-    """Obtient l'évaluation Stockfish pour une FEN donnée (analyse finale)."""
     engine = None
     try:
         engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
@@ -163,9 +160,9 @@ if __name__ == "__main__":
     fen_trouvee = False
     tentatives = 0
     
-    print("--- Générateur de Déséquilibre Matériel SÉVÈRE et Compensé ---")
+    print("--- Générateur de Déséquilibre Matériel SÉVÈRE et Compensé (SANS ÉCHEC) ---")
     print(f"Objectif : Évaluation {TARGET_MIN_CP/100:.2f} à {TARGET_MAX_CP/100:.2f}")
-    print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}).")
+    print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}) ET (PAS D'ÉCHEC INITIAL).")
     print("-" * 80)
     
     start_time = time.time()
@@ -176,16 +173,18 @@ if __name__ == "__main__":
         # 1. Génération Aléatoire Pure
         fen = generate_pure_random_fen()
         
-        # 2. Vérification de la Légalité Stricte
+        # 2. Vérification de la Légalité Stricte et de l'Échec Initial
         is_legal, board = is_fen_legal(fen)
+        
         if not is_legal:
-            print(f"Tentative {tentatives}: Illégale. Retente...", end='\r')
+            # Rejette si la position est illégale OU s'il y a échec au début
+            print(f"Tentative {tentatives}: Illégale ou en Échec. Retente...", end='\r')
             continue
             
         # 3. VÉRIFICATION DU MATÉRIEL TOTAL
         is_compensated_mat, white_mat, black_mat = is_material_compensated(board, MIN_MATERIAL_DIFFERENCE)
         
-        # 4. VÉRIFICATION DE LA DIFFÉRENCE DE PIÈCES (pour éliminer les échanges parfaits)
+        # 4. VÉRIFICATION DE LA DIFFÉRENCE DE PIÈCES
         is_compensated_piece = check_piece_difference(board, MIN_PIECE_DIFFERENCE)
         
         # Si les deux conditions matérielles sont remplies...
