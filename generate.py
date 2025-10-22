@@ -13,10 +13,9 @@ STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-wi
 STOCKFISH_DEPTH = 16 
 
 # PARAMÈTRES D'ÉVALUATION CIBLÉE (Avantage léger décisif)
-# Nous allons chercher une évaluation dans DEUX plages : [-100, -50] OU [+50, +100] centipions.
-TARGET_ABS_MIN_CP = 50  # 0.50 pion
-TARGET_ABS_MAX_CP = 100 # 1.00 pion
-MAX_ATTEMPTS = 5000 
+TARGET_ABS_MIN_CP = 30  
+TARGET_ABS_MAX_CP = 150 
+MAX_ATTEMPTS = 20000 
 
 # Déséquilibre Matériel Sévère (inchangé)
 MIN_MATERIAL_DIFFERENCE = 3.0 
@@ -37,25 +36,22 @@ PIECES_TO_GENERATE = [
 ] 
 
 
-# --- Fonctions de Génération Aléatoire et Légalité ---
+# --- Fonctions de Génération Aléatoire et Légalité (Inchangées) ---
 
 def generate_pure_random_fen():
     """Génère une FEN aléatoire en plaçant les pièces sur l'échiquier."""
-    board = chess.Board(None) # Plateau vide
-
-    # 1. Placer les Rois
+    board = chess.Board(None)
     king_squares = random.sample(chess.SQUARES, 2)
     board.set_piece_at(king_squares[0], chess.Piece(chess.KING, chess.WHITE))
     board.set_piece_at(king_squares[1], chess.Piece(chess.KING, chess.BLACK))
 
-    # 2. Placer les autres pièces aléatoirement
     available_squares = list(set(chess.SQUARES) - set(king_squares))
     random.shuffle(available_squares)
     
     num_pieces_to_place = random.randint(10, len(PIECES_TO_GENERATE) * 2) 
     pieces_to_place = random.sample(PIECES_TO_GENERATE * 2, num_pieces_to_place)
     
-    white_turn = random.choice([True, False]) # Qui est au trait
+    white_turn = random.choice([True, False])
     
     for piece_type in pieces_to_place:
         if not available_squares:
@@ -70,7 +66,6 @@ def generate_pure_random_fen():
 
         board.set_piece_at(square, chess.Piece(piece_type, color))
 
-    # 3. Finaliser la FEN
     fen_parts = board.fen().split(' ')
     fen_parts[1] = 'w' if white_turn else 'b'
     fen_parts[2] = '-' 
@@ -98,10 +93,9 @@ def is_fen_legal(fen: str):
         return False, None
 
 
-# --- Fonctions de Vérification Matérielle ---
+# --- Fonctions de Vérification Matérielle (Inchangées) ---
 
 def calculate_material_value(board: chess.Board):
-    """Calcule la valeur matérielle totale pour chaque couleur."""
     white_material = 0
     black_material = 0
     for piece_type, value in MATERIAL_VALUES.items():
@@ -111,15 +105,12 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
-    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
-    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
-    
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
@@ -133,16 +124,14 @@ def check_piece_difference(board: chess.Board, min_piece_diff: int):
     return False
 
 
-# --- Fonction d'Évaluation Stockfish (Simplifiée SANS détection de nulle) ---
+# --- Fonction d'Évaluation Stockfish (CRITIQUE : Prend l'objet engine en argument) ---
 
-def get_stockfish_evaluation(fen: str):
-    """Obtient l'évaluation Stockfish pour une FEN donnée."""
-    engine = None
+def get_stockfish_evaluation(engine: chess.engine.SimpleEngine, fen: str):
+    """Obtient l'évaluation Stockfish pour une FEN donnée en utilisant le moteur PRÉ-OUVERT."""
     try:
-        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
         board = chess.Board(fen)
         
-        # Nous n'avons besoin que de la meilleure évaluation (multipv=1)
+        # Utiliser l'objet engine qui est déjà ouvert
         info = engine.analyse(board, chess.engine.Limit(depth=STOCKFISH_DEPTH))
         score = info["score"].white() 
         
@@ -156,10 +145,9 @@ def get_stockfish_evaluation(fen: str):
         return evaluation_str, evaluation_cp
         
     except Exception as e:
+        print(f"\nErreur d'analyse Stockfish pour FEN {fen}: {e}")
         return None, None 
-    finally:
-        if engine:
-            engine.quit()
+
 
 # --- Script Principal : Boucle de Filtrage pour Avantage Léger Décisif ---
 
@@ -167,64 +155,88 @@ if __name__ == "__main__":
     
     fen_trouvee = False
     tentatives = 0
+    engine = None # Initialiser le moteur à None
     
-    print("--- Générateur de Déséquilibre Matériel SÉVÈRE avec Avantage Léger Décisif ---")
-    print(f"Objectif : Évaluation [{-TARGET_ABS_MAX_CP/100:.2f} à {TARGET_ABS_MIN_CP/100:.2f}] OU [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}].")
+    print("--- Générateur de Déséquilibre Matériel SÉVÈRE avec Avantage Léger Décisif (Stabilisé) ---")
+    print(f"Objectif : Évaluation [{-TARGET_ABS_MAX_CP/100:.2f} à -{-TARGET_ABS_MIN_CP/100:.2f}] OU [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}].")
     print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}).")
+    print(f"Profondeur d'analyse du script : {STOCKFISH_DEPTH} demi-coups.")
     print("-" * 80)
     
     start_time = time.time()
     
-    while not fen_trouvee and tentatives < MAX_ATTEMPTS:
-        tentatives += 1
-        
-        # 1. Génération Aléatoire Pure
-        fen = generate_pure_random_fen()
-        
-        # 2. Vérification de la Légalité Stricte et de l'Échec Initial
-        is_legal, board = is_fen_legal(fen)
-        
-        if not is_legal:
-            print(f"Tentative {tentatives}: Illégale ou en Échec. Retente...", end='\r')
-            continue
+    # *** ÉTAPE CRITIQUE : OUVRIR STOCKFISH UNE SEULE FOIS ***
+    try:
+        if not os.path.exists(STOCKFISH_PATH):
+             print(f"\nERREUR FATALE: Fichier Stockfish non trouvé à l'emplacement: {STOCKFISH_PATH}")
+             exit()
+
+        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+        print("Moteur Stockfish démarré avec succès. Début du filtrage...")
+
+    except Exception as e:
+        print(f"\nERREUR FATALE: Impossible de démarrer Stockfish: {e}")
+        exit()
+
+
+    try:
+        while not fen_trouvee and tentatives < MAX_ATTEMPTS:
+            tentatives += 1
             
-        # 3. VÉRIFICATION DU MATÉRIEL TOTAL ET DES PIÈCES
-        is_compensated_mat, white_mat, black_mat = is_material_compensated(board, MIN_MATERIAL_DIFFERENCE)
-        is_compensated_piece = check_piece_difference(board, MIN_PIECE_DIFFERENCE)
-        
-        if is_compensated_mat and is_compensated_piece:
+            # 1. Génération Aléatoire Pure
+            fen = generate_pure_random_fen()
             
-            # 4. Évaluation Stockfish (lent)
-            evaluation_str, evaluation_cp = get_stockfish_evaluation(fen)
+            # 2. Vérification de la Légalité Stricte et de l'Échec Initial
+            is_legal, board = is_fen_legal(fen)
             
-            # --- NOUVELLE LOGIQUE DE FILTRAGE : VÉRIFICATION DES DEUX PLAGES D'AVANTAGE ---
-            is_in_target_range = False
-            
-            if evaluation_cp is not None:
-                # Plage Avantage Blanc (+0.50 à +1.00)
-                if TARGET_ABS_MIN_CP <= evaluation_cp <= TARGET_ABS_MAX_CP:
-                    is_in_target_range = True
-                # Plage Avantage Noir (-1.00 à -0.50)
-                elif -TARGET_ABS_MAX_CP <= evaluation_cp <= -TARGET_ABS_MIN_CP:
-                    is_in_target_range = True
-            
-            if is_in_target_range:
-                # 5. Succès ! Toutes les conditions sont remplies.
-                fen_trouvee = True
+            if not is_legal:
+                print(f"Tentative {tentatives}: Illégale ou en Échec. Retente...", end='\r')
+                continue
                 
-                print("\n✅ POSITION ALÉATOIRE AVEC AVANTAGE LÉGER DÉCISIF TROUVÉE !")
-                print(f"FEN : {fen}")
-                print(f"Matériel Blanc: {white_mat}, Matériel Noir: {black_mat}. Différence: {abs(white_mat - black_mat)} points.")
-                print(f"Tour au trait : {'Blanc' if board.turn == chess.WHITE else 'Noir'}")
-                print(f"Évaluation Stockfish (dép. {STOCKFISH_DEPTH}) : {evaluation_str}")
-                print(f"Trouvé en {tentatives} tentatives (Temps écoulé : {time.time() - start_time:.2f}s)")
+            # 3. VÉRIFICATION DU MATÉRIEL TOTAL ET DES PIÈCES
+            is_compensated_mat, white_mat, black_mat = is_material_compensated(board, MIN_MATERIAL_DIFFERENCE)
+            is_compensated_piece = check_piece_difference(board, MIN_PIECE_DIFFERENCE)
+            
+            if is_compensated_mat and is_compensated_piece:
                 
+                # 4. Évaluation Stockfish (lent) - Passage du moteur PRÉ-OUVERT
+                evaluation_str, evaluation_cp = get_stockfish_evaluation(engine, fen)
+                
+                # --- LOGIQUE DE FILTRAGE : VÉRIFICATION DES DEUX PLAGES D'AVANTAGE ---
+                is_in_target_range = False
+                
+                if evaluation_cp is not None:
+                    # Plage Avantage Blanc (+0.30 à +1.50)
+                    if TARGET_ABS_MIN_CP <= evaluation_cp <= TARGET_ABS_MAX_CP:
+                        is_in_target_range = True
+                    # Plage Avantage Noir (-1.50 à -0.30)
+                    elif -TARGET_ABS_MAX_CP <= evaluation_cp <= -TARGET_ABS_MIN_CP:
+                        is_in_target_range = True
+                
+                if is_in_target_range:
+                    # 5. Succès ! Toutes les conditions sont remplies.
+                    fen_trouvee = True
+                    
+                    print("\n" + "—" * 80)
+                    print("✅ POSITION ALÉATOIRE AVEC AVANTAGE LÉGER DÉCISIF TROUVÉE !")
+                    print(f"FEN : {fen}")
+                    print(f"Matériel Blanc: {white_mat}, Matériel Noir: {black_mat}. Différence: {abs(white_mat - black_mat)} points.")
+                    print(f"Tour au trait : {'Blanc' if board.turn == chess.WHITE else 'Noir'}")
+                    print(f"Évaluation Stockfish (dép. {STOCKFISH_DEPTH}) : {evaluation_str}")
+                    print(f"Trouvé en {tentatives} tentatives (Temps écoulé : {time.time() - start_time:.2f}s)")
+                    print("—" * 80)
+                    
+                else:
+                    print(f"Tentative {tentatives}: Éval: {evaluation_str}. Retente...", end='\r')
+            
             else:
-                print(f"Tentative {tentatives}: Éval: {evaluation_str}. Retente...", end='\r')
-        
-        else:
-            # Matériel ou différence de pièces insuffisante
-            print(f"Tentative {tentatives}: Matériel insuffisant. Diff. Mat: {abs(white_mat - black_mat)}. Retente...", end='\r')
+                print(f"Tentative {tentatives}: Matériel insuffisant. Diff. Mat: {abs(white_mat - black_mat)}. Retente...", end='\r')
+                
+        if not fen_trouvee:
+            print("\n\n❌ ÉCHEC : La position n'a pas été trouvée après le nombre maximal de tentatives.")
             
-    if not fen_trouvee:
-        print("\n\n❌ ÉCHEC : La position n'a pas été trouvée après le nombre maximal de tentatives.")
+    finally:
+        # *** ÉTAPE CRITIQUE : FERMER STOCKFISH UNE SEULE FOIS ***
+        if engine:
+            engine.quit()
+            print("Moteur Stockfish fermé.")
