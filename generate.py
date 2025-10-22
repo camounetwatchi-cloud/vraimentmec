@@ -10,8 +10,7 @@ import math
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-windows-x86-64-avx2.exe")
 
 # Paramètres d'analyse
-# Profondeur augmentée pour une meilleure stabilité/précision de l'évaluation
-STOCKFISH_DEPTH = 30 # Changé pour correspondre à votre exécution précédente
+STOCKFISH_DEPTH = 30 # Correspond à la profondeur de votre dernière exécution
 
 # PARAMÈTRES D'ÉVALUATION CIBLÉE (Avantage léger décisif)
 TARGET_ABS_MIN_CP = 30  
@@ -37,11 +36,21 @@ PIECES_TO_GENERATE = [
 ] 
 
 
-# --- Fonctions de Génération Aléatoire et Légalité ---
+# --- Fonctions de Vérification ---
+
+def get_square_color(square: chess.Square) -> bool:
+    """Détermine la couleur de la case (True pour clair, False pour sombre)."""
+    # La somme de la rangée et de la colonne donne la parité de la couleur de la case.
+    return (chess.square_rank(square) + chess.square_file(square)) % 2 == 0
 
 def generate_pure_random_fen():
-    """Génère une FEN aléatoire en plaçant les pièces sur l'échiquier."""
+    """
+    Génère une FEN aléatoire en respectant la contrainte 
+    "pas plus d'un Fou par couleur de case et par joueur" dès la source.
+    """
     board = chess.Board(None)
+    
+    # 1. Placement des Rois
     king_squares = random.sample(chess.SQUARES, 2)
     board.set_piece_at(king_squares[0], chess.Piece(chess.KING, chess.WHITE))
     board.set_piece_at(king_squares[1], chess.Piece(chess.KING, chess.BLACK))
@@ -52,69 +61,80 @@ def generate_pure_random_fen():
     num_pieces_to_place = random.randint(10, len(PIECES_TO_GENERATE) * 2) 
     pieces_to_place = random.sample(PIECES_TO_GENERATE * 2, num_pieces_to_place)
     
-    white_turn = random.choice([True, False])
+    # 2. Suivi des Fous par couleur de case
+    bishops_on_light = {chess.WHITE: False, chess.BLACK: False}
+    bishops_on_dark = {chess.WHITE: False, chess.BLACK: False}
     
+    temp_available_squares = available_squares[:]
+
     for piece_type in pieces_to_place:
-        if not available_squares:
+        if not temp_available_squares:
             break
             
-        square = available_squares.pop()
         color = random.choice([chess.WHITE, chess.BLACK])
-        
+        valid_squares_for_placement = temp_available_squares[:]
+
+        # --- A. APPLICATION DES CONTRAINTES DE PLACEMENT ---
+
         if piece_type == chess.PAWN:
-            if chess.square_rank(square) == 0 or chess.square_rank(square) == 7:
-                continue
+            # Les pions ne peuvent pas être placés sur les rangées de promotion
+            valid_squares_for_placement = [sq for sq in valid_squares_for_placement if chess.square_rank(sq) not in (0, 7)]
+        
+        elif piece_type == chess.BISHOP:
+            allowed_squares_for_bishop = []
+            
+            # Si le camp n'a pas encore de Fou sur case claire (True), ces cases sont autorisées
+            if not bishops_on_light[color]:
+                allowed_squares_for_bishop.extend([sq for sq in valid_squares_for_placement if get_square_color(sq)])
+            
+            # Si le camp n'a pas encore de Fou sur case sombre (False), ces cases sont autorisées
+            if not bishops_on_dark[color]:
+                allowed_squares_for_bishop.extend([sq for sq in valid_squares_for_placement if not get_square_color(sq)])
+            
+            valid_squares_for_placement = allowed_squares_for_bishop
 
+        # --- B. PLACEMENT FINAL ---
+
+        if not valid_squares_for_placement:
+            continue # Aucune case valide, on passe à la pièce suivante
+            
+        # Sélection aléatoire parmi les cases valides restantes
+        square = random.choice(valid_squares_for_placement)
+        
+        # Mise à jour du suivi pour les Fous
+        if piece_type == chess.BISHOP:
+            is_light = get_square_color(square)
+            if is_light:
+                bishops_on_light[color] = True
+            else:
+                bishops_on_dark[color] = True
+        
+        # Placer la pièce et retirer la case de la liste des cases disponibles
         board.set_piece_at(square, chess.Piece(piece_type, color))
+        temp_available_squares.remove(square)
 
+    # 3. Finalisation de la FEN
     fen_parts = board.fen().split(' ')
+    white_turn = random.choice([True, False])
     fen_parts[1] = 'w' if white_turn else 'b'
-    fen_parts[2] = '-' 
-    fen_parts[3] = '-' 
+    fen_parts[2] = '-' # Pas de droits de roque
+    fen_parts[3] = '-' # Pas de prise en passant
     fen_parts[4] = '0'
-    fen_parts[5] = str(random.randint(10, 50))
+    fen_parts[5] = str(random.randint(10, 50)) # Compteur de coup arbitraire pour le dynamisme
 
-    return ' '.join(fen_parts)
-
-def get_square_color(square: chess.Square) -> bool:
-    """Détermine la couleur de la case (True pour clair, False pour sombre)."""
-    # Utilise la somme de la rangée et de la colonne pour déterminer la couleur de la case (méthode compatible).
-    return (chess.square_rank(square) + chess.square_file(square)) % 2 == 0
-
-def has_two_bishops_of_same_color(board: chess.Board, color: bool) -> bool:
-    """Vérifie si le joueur 'color' a deux fous sur des cases de la même couleur (clair/sombre)."""
-    
-    bishop_squares = list(board.pieces(chess.BISHOP, color))
-    if len(bishop_squares) < 2:
-        return False
-
-    # Déterminer la couleur de la case pour chaque Fou
-    is_light_square = [get_square_color(sq) for sq in bishop_squares]
-
-    # Compter le nombre de Fous sur cases claires (True) et sombres (False)
-    light_square_bishops = sum(is_light_square)
-    dark_square_bishops = len(is_light_square) - light_square_bishops
-    
-    # Rejeter si le joueur a 2+ Fous sur cases claires OU 2+ Fous sur cases sombres
-    if light_square_bishops >= 2 or dark_square_bishops >= 2:
-        return True
-    
-    return False
+    return ' '.join(fen_parts), board
 
 
-def is_fen_legal(fen: str):
-    """Vérifie si une FEN est valide, ne commence pas par un échec, et respecte la contrainte des Fous."""
+def is_fen_legal(fen_and_board: tuple):
+    """Vérifie si une FEN est valide et ne commence pas par un échec."""
+    fen, board = fen_and_board
     try:
-        board = chess.Board(fen)
+        # La contrainte des Fous est garantie par la fonction de génération
         
         if not board.is_valid():
             return False, None
             
         if board.is_check():
-            return False, None
-            
-        # NOUVELLE CONTRAINTE : Vérifier les Fous Blancs et Noirs
-        if has_two_bishops_of_same_color(board, chess.WHITE) or has_two_bishops_of_same_color(board, chess.BLACK):
             return False, None
             
         return True, board
@@ -126,6 +146,7 @@ def is_fen_legal(fen: str):
 # --- Fonctions de Vérification Matérielle (Inchangées) ---
 
 def calculate_material_value(board: chess.Board):
+    """Calcule la valeur matérielle totale pour chaque couleur."""
     white_material = 0
     black_material = 0
     for piece_type, value in MATERIAL_VALUES.items():
@@ -135,12 +156,15 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
+    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
+    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
+    
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
@@ -185,10 +209,10 @@ if __name__ == "__main__":
     tentatives = 0
     engine = None 
     
-    print("--- Générateur de Déséquilibre Matériel SÉVÈRE avec Avantage Léger Décisif (Stabilisé) ---")
+    print("--- Générateur de Déséquilibre Matériel SÉVÈRE avec Avantage Léger Décisif (Optimisation à la source) ---")
     print(f"Objectif : Évaluation [{-TARGET_ABS_MAX_CP/100:.2f} à -{-TARGET_ABS_MIN_CP/100:.2f}] OU [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}].")
     print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}).")
-    print(f"**Contrainte** : Pas plus d'un Fou par couleur de case (par joueur).")
+    print(f"**Contrainte** : Garantie de l'unicité de la couleur des Fous PAR LA GÉNÉRATION.")
     print(f"Profondeur d'analyse du script : {STOCKFISH_DEPTH} demi-coups.")
     print("-" * 80)
     
@@ -212,14 +236,14 @@ if __name__ == "__main__":
         while not fen_trouvee and tentatives < MAX_ATTEMPTS:
             tentatives += 1
             
-            # 1. Génération Aléatoire Pure
-            fen = generate_pure_random_fen()
+            # 1. Génération Aléatoire Pure (qui garantit maintenant les Fous)
+            fen, board = generate_pure_random_fen()
             
-            # 2. Vérification de la Légalité Stricte, de l'Échec Initial et des FOUS
-            is_legal, board = is_fen_legal(fen)
+            # 2. Vérification de la Légalité Stricte et de l'Échec Initial
+            is_legal, board = is_fen_legal((fen, board))
             
             if not is_legal:
-                print(f"Tentative {tentatives}: Illégale, en Échec, ou 2 Fous même couleur. Retente...", end='\r')
+                print(f"Tentative {tentatives}: Illégale ou en Échec. Retente...", end='\r')
                 continue
                 
             # 3. VÉRIFICATION DU MATÉRIEL TOTAL ET DES PIÈCES
@@ -228,7 +252,7 @@ if __name__ == "__main__":
             
             if is_compensated_mat and is_compensated_piece:
                 
-                # 4. Évaluation Stockfish (lent) - Passage du moteur PRÉ-OUVERT
+                # 4. Évaluation Stockfish (lent)
                 evaluation_str, evaluation_cp = get_stockfish_evaluation(engine, fen)
                 
                 # --- LOGIQUE DE FILTRAGE : VÉRIFICATION DES DEUX PLAGES D'AVANTAGE ---
