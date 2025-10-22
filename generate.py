@@ -10,6 +10,7 @@ import math
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-windows-x86-64-avx2.exe")
 
 # Paramètres d'analyse
+# Profondeur augmentée pour une meilleure stabilité/précision de l'évaluation
 STOCKFISH_DEPTH = 20 
 
 # PARAMÈTRES D'ÉVALUATION CIBLÉE (Avantage léger décisif)
@@ -36,7 +37,7 @@ PIECES_TO_GENERATE = [
 ] 
 
 
-# --- Fonctions de Génération Aléatoire et Légalité (Inchangées) ---
+# --- Fonctions de Génération Aléatoire et Légalité ---
 
 def generate_pure_random_fen():
     """Génère une FEN aléatoire en plaçant les pièces sur l'échiquier."""
@@ -75,9 +76,30 @@ def generate_pure_random_fen():
 
     return ' '.join(fen_parts)
 
+def has_two_bishops_of_same_color(board: chess.Board, color: bool) -> bool:
+    """Vérifie si le joueur 'color' a deux fous sur des cases de la même couleur."""
+    
+    bishop_squares = board.pieces(chess.BISHOP, color)
+    if len(bishop_squares) < 2:
+        return False
+
+    # Couleur des cases : True pour clair (Blanc), False pour sombre (Noir)
+    square_colors = [chess.square_color(sq) for sq in bishop_squares]
+
+    # Compter le nombre de Fous sur cases claires et le nombre sur cases sombres
+    light_square_bishops = sum(square_colors)
+    dark_square_bishops = len(square_colors) - light_square_bishops
+    
+    # Si le joueur a deux fous ou plus sur des cases CLAIRES OU deux fous ou plus sur des cases SOMBRE,
+    # cela signifie qu'il a deux fous de "même couleur" (par rapport à la case).
+    if light_square_bishops >= 2 or dark_square_bishops >= 2:
+        return True
+    
+    return False
+
 
 def is_fen_legal(fen: str):
-    """Vérifie si une FEN est valide et ne commence pas par un échec."""
+    """Vérifie si une FEN est valide, ne commence pas par un échec, et respecte la contrainte des Fous."""
     try:
         board = chess.Board(fen)
         
@@ -85,6 +107,10 @@ def is_fen_legal(fen: str):
             return False, None
             
         if board.is_check():
+            return False, None
+            
+        # NOUVELLE CONTRAINTE : Vérifier les Fous Blancs et Noirs
+        if has_two_bishops_of_same_color(board, chess.WHITE) or has_two_bishops_of_same_color(board, chess.BLACK):
             return False, None
             
         return True, board
@@ -96,6 +122,7 @@ def is_fen_legal(fen: str):
 # --- Fonctions de Vérification Matérielle (Inchangées) ---
 
 def calculate_material_value(board: chess.Board):
+    """Calcule la valeur matérielle totale pour chaque couleur."""
     white_material = 0
     black_material = 0
     for piece_type, value in MATERIAL_VALUES.items():
@@ -105,12 +132,15 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
+    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
+    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
+    
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
@@ -124,14 +154,13 @@ def check_piece_difference(board: chess.Board, min_piece_diff: int):
     return False
 
 
-# --- Fonction d'Évaluation Stockfish (CRITIQUE : Prend l'objet engine en argument) ---
+# --- Fonction d'Évaluation Stockfish (Stabilisée, Inchangée) ---
 
 def get_stockfish_evaluation(engine: chess.engine.SimpleEngine, fen: str):
     """Obtient l'évaluation Stockfish pour une FEN donnée en utilisant le moteur PRÉ-OUVERT."""
     try:
         board = chess.Board(fen)
         
-        # Utiliser l'objet engine qui est déjà ouvert
         info = engine.analyse(board, chess.engine.Limit(depth=STOCKFISH_DEPTH))
         score = info["score"].white() 
         
@@ -145,7 +174,6 @@ def get_stockfish_evaluation(engine: chess.engine.SimpleEngine, fen: str):
         return evaluation_str, evaluation_cp
         
     except Exception as e:
-        print(f"\nErreur d'analyse Stockfish pour FEN {fen}: {e}")
         return None, None 
 
 
@@ -155,17 +183,18 @@ if __name__ == "__main__":
     
     fen_trouvee = False
     tentatives = 0
-    engine = None # Initialiser le moteur à None
+    engine = None 
     
     print("--- Générateur de Déséquilibre Matériel SÉVÈRE avec Avantage Léger Décisif (Stabilisé) ---")
     print(f"Objectif : Évaluation [{-TARGET_ABS_MAX_CP/100:.2f} à -{-TARGET_ABS_MIN_CP/100:.2f}] OU [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}].")
     print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}).")
+    print(f"**Contrainte** : Pas plus d'un Fou par couleur de case (par joueur).")
     print(f"Profondeur d'analyse du script : {STOCKFISH_DEPTH} demi-coups.")
     print("-" * 80)
     
     start_time = time.time()
     
-    # *** ÉTAPE CRITIQUE : OUVRIR STOCKFISH UNE SEULE FOIS ***
+    # ÉTAPE CRITIQUE : OUVRIR STOCKFISH UNE SEULE FOIS
     try:
         if not os.path.exists(STOCKFISH_PATH):
              print(f"\nERREUR FATALE: Fichier Stockfish non trouvé à l'emplacement: {STOCKFISH_PATH}")
@@ -186,11 +215,11 @@ if __name__ == "__main__":
             # 1. Génération Aléatoire Pure
             fen = generate_pure_random_fen()
             
-            # 2. Vérification de la Légalité Stricte et de l'Échec Initial
+            # 2. Vérification de la Légalité Stricte, de l'Échec Initial et des FOUS
             is_legal, board = is_fen_legal(fen)
             
             if not is_legal:
-                print(f"Tentative {tentatives}: Illégale ou en Échec. Retente...", end='\r')
+                print(f"Tentative {tentatives}: Illégale, en Échec, ou 2 Fous même couleur. Retente...", end='\r')
                 continue
                 
             # 3. VÉRIFICATION DU MATÉRIEL TOTAL ET DES PIÈCES
@@ -236,7 +265,7 @@ if __name__ == "__main__":
             print("\n\n❌ ÉCHEC : La position n'a pas été trouvée après le nombre maximal de tentatives.")
             
     finally:
-        # *** ÉTAPE CRITIQUE : FERMER STOCKFISH UNE SEULE FOIS ***
+        # ÉTAPE CRITIQUE : FERMER STOCKFISH UNE SEULE FOIS
         if engine:
             engine.quit()
             print("Moteur Stockfish fermé.")
