@@ -11,7 +11,7 @@ STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-wi
 
 # Paramètres d'analyse
 # Profondeur augmentée pour une meilleure stabilité/précision de l'évaluation
-STOCKFISH_DEPTH = 30
+STOCKFISH_DEPTH = 30 # Changé pour correspondre à votre exécution précédente
 
 # PARAMÈTRES D'ÉVALUATION CIBLÉE (Avantage léger décisif)
 TARGET_ABS_MIN_CP = 30  
@@ -76,22 +76,26 @@ def generate_pure_random_fen():
 
     return ' '.join(fen_parts)
 
+def get_square_color(square: chess.Square) -> bool:
+    """Détermine la couleur de la case (True pour clair, False pour sombre)."""
+    # Utilise la somme de la rangée et de la colonne pour déterminer la couleur de la case (méthode compatible).
+    return (chess.square_rank(square) + chess.square_file(square)) % 2 == 0
+
 def has_two_bishops_of_same_color(board: chess.Board, color: bool) -> bool:
-    """Vérifie si le joueur 'color' a deux fous sur des cases de la même couleur."""
+    """Vérifie si le joueur 'color' a deux fous sur des cases de la même couleur (clair/sombre)."""
     
-    bishop_squares = board.pieces(chess.BISHOP, color)
+    bishop_squares = list(board.pieces(chess.BISHOP, color))
     if len(bishop_squares) < 2:
         return False
 
-    # Couleur des cases : True pour clair (Blanc), False pour sombre (Noir)
-    square_colors = [chess.square_color(sq) for sq in bishop_squares]
+    # Déterminer la couleur de la case pour chaque Fou
+    is_light_square = [get_square_color(sq) for sq in bishop_squares]
 
-    # Compter le nombre de Fous sur cases claires et le nombre sur cases sombres
-    light_square_bishops = sum(square_colors)
-    dark_square_bishops = len(square_colors) - light_square_bishops
+    # Compter le nombre de Fous sur cases claires (True) et sombres (False)
+    light_square_bishops = sum(is_light_square)
+    dark_square_bishops = len(is_light_square) - light_square_bishops
     
-    # Si le joueur a deux fous ou plus sur des cases CLAIRES OU deux fous ou plus sur des cases SOMBRE,
-    # cela signifie qu'il a deux fous de "même couleur" (par rapport à la case).
+    # Rejeter si le joueur a 2+ Fous sur cases claires OU 2+ Fous sur cases sombres
     if light_square_bishops >= 2 or dark_square_bishops >= 2:
         return True
     
@@ -122,7 +126,6 @@ def is_fen_legal(fen: str):
 # --- Fonctions de Vérification Matérielle (Inchangées) ---
 
 def calculate_material_value(board: chess.Board):
-    """Calcule la valeur matérielle totale pour chaque couleur."""
     white_material = 0
     black_material = 0
     for piece_type, value in MATERIAL_VALUES.items():
@@ -132,15 +135,12 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
-    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
-    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
-    
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
