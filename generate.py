@@ -11,7 +11,7 @@ STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-wi
 
 # Paramètres d'analyse
 # Profondeur augmentée pour une meilleure stabilité/précision de l'évaluation
-STOCKFISH_DEPTH = 20 
+STOCKFISH_DEPTH = 30
 
 # PARAMÈTRES D'ÉVALUATION CIBLÉE (Avantage léger décisif)
 TARGET_ABS_MIN_CP = 30  
