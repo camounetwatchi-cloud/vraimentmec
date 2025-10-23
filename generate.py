@@ -9,7 +9,7 @@ import math
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-windows-x86-64-avx2.exe")
 
 # Paramètres d'analyse - RÉDUITS pour la vitesse
-STOCKFISH_DEPTH = 18  # Réduit de 30 à 18 (gain de vitesse x3-4)
+STOCKFISH_DEPTH = 26  # Réduit de 30 à 18 (gain de vitesse x3-4)
 STOCKFISH_TIME_LIMIT = 0.5  # Limite de temps en secondes par analyse
 
 # Paramètres d'évaluation
