@@ -187,10 +187,16 @@ def get_stockfish_evaluation_batch(engine: chess.engine.SimpleEngine, fens: list
     for fen in fens:
         try:
             board = chess.Board(fen)
+            # IMPORTANT: Analyser AU MOINS 2 lignes
             info = engine.analyse(board, 
                                  chess.engine.Limit(depth=STOCKFISH_DEPTH, 
                                                    time=STOCKFISH_TIME_LIMIT),
                                  multipv=2)
+            
+            # Vérifier qu'on a bien reçu 2 lignes minimum
+            if len(info) < 2:
+                results.append((None, None))
+                continue
             
             scores_cp = []
             scores_str = []
@@ -221,7 +227,7 @@ if __name__ == "__main__":
     positions_candidates = []
     
     print("--- Générateur FEN Optimisé avec Déséquilibre Matériel ---")
-    print(f"Plage cible: [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}] pions")
+    print(f"Plage cible (2 lignes min): [+{TARGET_ABS_MIN_CP/100:.2f} à +{TARGET_ABS_MAX_CP/100:.2f}] OU [-{TARGET_ABS_MAX_CP/100:.2f} à -{TARGET_ABS_MIN_CP/100:.2f}] pions")
     print(f"Déséquilibre: ≥{MIN_MATERIAL_DIFFERENCE} points")
     print(f"Profondeur: {STOCKFISH_DEPTH} (limite {STOCKFISH_TIME_LIMIT}s)")
     print("—" * 80)
@@ -264,6 +270,9 @@ if __name__ == "__main__":
                     
                     for (fen, board, w_mat, b_mat), (scores_cp, scores_str) in zip(candidates_buffer, results):
                         if scores_cp and len(scores_cp) >= 2:
+                            # Vérifier que les 2 lignes sont dans la plage cible
+                            # Plage Blanc: +0.25 à +1.00 (25 à 100 centipawns)
+                            # Plage Noir: -0.25 à -1.00 (-25 à -100 centipawns)
                             valid_count = sum(1 for cp in scores_cp[:2] 
                                             if (TARGET_ABS_MIN_CP <= cp <= TARGET_ABS_MAX_CP) or
                                                (-TARGET_ABS_MAX_CP <= cp <= -TARGET_ABS_MIN_CP))
