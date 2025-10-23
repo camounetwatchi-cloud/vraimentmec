@@ -10,7 +10,7 @@ import math
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-windows-x86-64-avx2.exe")
 
 # Paramètres d'analyse
-STOCKFISH_DEPTH = 30 
+STOCKFISH_DEPTH = 22 
 
 # NOUVEAUX PARAMÈTRES D'ÉVALUATION CIBLÉE (LÉGÈREMENT DÉSÉQUILIBRÉ MAIS JOUABLE)
 TARGET_ABS_MIN_CP = 25  # 0.25 pion
