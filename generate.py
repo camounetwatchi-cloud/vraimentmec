@@ -10,12 +10,15 @@ import math
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-windows-x86-64-avx2.exe")
 
 # Paramètres d'analyse
-STOCKFISH_DEPTH = 22 
+STOCKFISH_DEPTH = 30 
 
-# NOUVEAUX PARAMÈTRES D'ÉVALUATION CIBLÉE (LÉGÈREMENT DÉSÉQUILIBRÉ MAIS JOUABLE)
+# NOUVEAUX PARAMÈTRES D'ÉVALUATION CIBLÉE
 TARGET_ABS_MIN_CP = 25  # 0.25 pion
 TARGET_ABS_MAX_CP = 100 # 1.00 pion
 MAX_ATTEMPTS = 20000 
+
+# NOUVELLE CONTRAINTE MATÉRIELLE MAXIMALE
+MAX_MATERIAL_PER_SIDE = 22
 
 # Déséquilibre Matériel Sévère (inchangé)
 MIN_MATERIAL_DIFFERENCE = 3.0 
@@ -30,6 +33,7 @@ MATERIAL_VALUES = {
 }
 
 # PIÈCES DISPONIBLES POUR LA GÉNÉRATION ALÉATOIRE
+# Le Roi n'est pas inclus car il est placé séparément.
 PIECES_TO_GENERATE = [
     chess.ROOK, chess.ROOK, chess.KNIGHT, chess.KNIGHT, chess.BISHOP, chess.BISHOP, chess.QUEEN, 
     chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN, chess.PAWN
@@ -40,13 +44,18 @@ PIECES_TO_GENERATE = [
 
 def get_square_color(square: chess.Square) -> bool:
     """Détermine la couleur de la case (True pour clair, False pour sombre)."""
-    # Utilise la somme de la rangée et de la colonne pour déterminer la couleur de la case (méthode compatible).
     return (chess.square_rank(square) + chess.square_file(square)) % 2 == 0
+
+def get_piece_value(piece_type: chess.PieceType) -> int:
+    """Retourne la valeur matérielle de la pièce, ou 0 si non trouvée."""
+    return MATERIAL_VALUES.get(piece_type, 0)
+
 
 def generate_pure_random_fen():
     """
-    Génère une FEN aléatoire en respectant la contrainte 
-    "pas plus d'un Fou par couleur de case et par joueur" dès la source.
+    Génère une FEN aléatoire en respectant les contraintes :
+    1. Max 22 points de matériel par joueur.
+    2. Pas plus d'un Fou par couleur de case et par joueur.
     """
     board = chess.Board(None)
     
@@ -61,7 +70,8 @@ def generate_pure_random_fen():
     num_pieces_to_place = random.randint(10, len(PIECES_TO_GENERATE) * 2) 
     pieces_to_place = random.sample(PIECES_TO_GENERATE * 2, num_pieces_to_place)
     
-    # 2. Suivi des Fous par couleur de case
+    # 2. Suivi des contraintes
+    current_material = {chess.WHITE: 0, chess.BLACK: 0}
     bishops_on_light = {chess.WHITE: False, chess.BLACK: False}
     bishops_on_dark = {chess.WHITE: False, chess.BLACK: False}
     
@@ -71,23 +81,27 @@ def generate_pure_random_fen():
         if not temp_available_squares:
             break
             
+        piece_value = get_piece_value(piece_type)
         color = random.choice([chess.WHITE, chess.BLACK])
         valid_squares_for_placement = temp_available_squares[:]
 
         # --- A. APPLICATION DES CONTRAINTES DE PLACEMENT ---
 
+        # 1. Contrainte Matérielle Maximum (Nouvelle)
+        if current_material[color] + piece_value > MAX_MATERIAL_PER_SIDE:
+            continue # La pièce dépasse la limite de 22 points pour ce camp
+
+        # 2. Contrainte des Pions
         if piece_type == chess.PAWN:
-            # Les pions ne peuvent pas être placés sur les rangées de promotion
             valid_squares_for_placement = [sq for sq in valid_squares_for_placement if chess.square_rank(sq) not in (0, 7)]
         
+        # 3. Contrainte des Fous
         elif piece_type == chess.BISHOP:
             allowed_squares_for_bishop = []
             
-            # Si le camp n'a pas encore de Fou sur case claire (True), ces cases sont autorisées
             if not bishops_on_light[color]:
                 allowed_squares_for_bishop.extend([sq for sq in valid_squares_for_placement if get_square_color(sq)])
             
-            # Si le camp n'a pas encore de Fou sur case sombre (False), ces cases sont autorisées
             if not bishops_on_dark[color]:
                 allowed_squares_for_bishop.extend([sq for sq in valid_squares_for_placement if not get_square_color(sq)])
             
@@ -96,7 +110,7 @@ def generate_pure_random_fen():
         # --- B. PLACEMENT FINAL ---
 
         if not valid_squares_for_placement:
-            continue # Aucune case valide, on passe à la pièce suivante
+            continue # Aucune case valide restante pour cette pièce
             
         # Sélection aléatoire parmi les cases valides restantes
         square = random.choice(valid_squares_for_placement)
@@ -109,6 +123,9 @@ def generate_pure_random_fen():
             else:
                 bishops_on_dark[color] = True
         
+        # Mise à jour du matériel
+        current_material[color] += piece_value
+        
         # Placer la pièce et retirer la case de la liste des cases disponibles
         board.set_piece_at(square, chess.Piece(piece_type, color))
         temp_available_squares.remove(square)
@@ -117,10 +134,10 @@ def generate_pure_random_fen():
     fen_parts = board.fen().split(' ')
     white_turn = random.choice([True, False])
     fen_parts[1] = 'w' if white_turn else 'b'
-    fen_parts[2] = '-' # Pas de droits de roque
-    fen_parts[3] = '-' # Pas de prise en passant
+    fen_parts[2] = '-' 
+    fen_parts[3] = '-' 
     fen_parts[4] = '0'
-    fen_parts[5] = str(random.randint(10, 50)) # Compteur de coup arbitraire pour le dynamisme
+    fen_parts[5] = str(random.randint(10, 50)) 
 
     return ' '.join(fen_parts), board
 
@@ -129,7 +146,7 @@ def is_fen_legal(fen_and_board: tuple):
     """Vérifie si une FEN est valide et ne commence pas par un échec."""
     fen, board = fen_and_board
     try:
-        # La contrainte des Fous est garantie par la fonction de génération
+        # Les contraintes Matérielles et Fous sont garanties par la fonction de génération
         
         if not board.is_valid():
             return False, None
@@ -146,6 +163,7 @@ def is_fen_legal(fen_and_board: tuple):
 # --- Fonctions de Vérification Matérielle (Inchangées) ---
 
 def calculate_material_value(board: chess.Board):
+    """Calcule la valeur matérielle totale pour chaque couleur."""
     white_material = 0
     black_material = 0
     for piece_type, value in MATERIAL_VALUES.items():
@@ -155,12 +173,15 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
+    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
+    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
+    
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
@@ -174,7 +195,7 @@ def check_piece_difference(board: chess.Board, min_piece_diff: int):
     return False
 
 
-# --- Fonction d'Évaluation Stockfish (MISES À JOUR pour multipv=2) ---
+# --- Fonction d'Évaluation Stockfish (multipv=2) ---
 
 def get_stockfish_evaluation(engine: chess.engine.SimpleEngine, fen: str):
     """Obtient les deux premières évaluations (multipv=2) Stockfish pour une FEN donnée."""
@@ -218,7 +239,8 @@ if __name__ == "__main__":
     print("--- Générateur de Déséquilibre Matériel SÉVÈRE avec double Ligne d'Analyse (Optimisé) ---")
     print(f"Objectif : **AU MOINS 2 LIGNES** évaluées dans la plage [{-TARGET_ABS_MAX_CP/100:.2f} à -{-TARGET_ABS_MIN_CP/100:.2f}] OU [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}].")
     print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}).")
-    print(f"**Contrainte** : Garantie de l'unicité de la couleur des Fous PAR LA GÉNÉRATION.")
+    print(f"**Contrainte** : Matériel Max par joueur : {MAX_MATERIAL_PER_SIDE} points. Garantie par la génération.")
+    print(f"**Contrainte** : Unicité de la couleur des Fous. Garantie par la génération.")
     print(f"Profondeur d'analyse du script : {STOCKFISH_DEPTH} demi-coups.")
     print("-" * 80)
     
@@ -242,7 +264,7 @@ if __name__ == "__main__":
         while not fen_trouvee and tentatives < MAX_ATTEMPTS:
             tentatives += 1
             
-            # 1. Génération Aléatoire Pure (qui garantit maintenant les Fous)
+            # 1. Génération Aléatoire Pure (qui garantit maintenant Fous et Matériel Max)
             fen, board = generate_pure_random_fen()
             
             # 2. Vérification de la Légalité Stricte et de l'Échec Initial
