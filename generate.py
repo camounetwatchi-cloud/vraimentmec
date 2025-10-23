@@ -9,7 +9,7 @@ import math
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-windows-x86-64-avx2.exe")
 
 # Paramètres d'analyse - RÉDUITS pour la vitesse
-STOCKFISH_DEPTH = 26  # Réduit de 30 à 18 (gain de vitesse x3-4)
+STOCKFISH_DEPTH = 24  # Réduit de 30 à 18 (gain de vitesse x3-4)
 STOCKFISH_TIME_LIMIT = 0.5  # Limite de temps en secondes par analyse
 
 # Paramètres d'évaluation
@@ -227,7 +227,7 @@ if __name__ == "__main__":
     positions_candidates = []
     
     print("--- Générateur FEN Optimisé avec Déséquilibre Matériel ---")
-    print(f"Plage cible (2 lignes min): [+{TARGET_ABS_MIN_CP/100:.2f} à +{TARGET_ABS_MAX_CP/100:.2f}] OU [-{TARGET_ABS_MAX_CP/100:.2f} à -{TARGET_ABS_MIN_CP/100:.2f}] pions")
+    print(f"Plage cible: [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}] pions")
     print(f"Déséquilibre: ≥{MIN_MATERIAL_DIFFERENCE} points")
     print(f"Profondeur: {STOCKFISH_DEPTH} (limite {STOCKFISH_TIME_LIMIT}s)")
     print("—" * 80)
@@ -270,9 +270,6 @@ if __name__ == "__main__":
                     
                     for (fen, board, w_mat, b_mat), (scores_cp, scores_str) in zip(candidates_buffer, results):
                         if scores_cp and len(scores_cp) >= 2:
-                            # Vérifier que les 2 lignes sont dans la plage cible
-                            # Plage Blanc: +0.25 à +1.00 (25 à 100 centipawns)
-                            # Plage Noir: -0.25 à -1.00 (-25 à -100 centipawns)
                             valid_count = sum(1 for cp in scores_cp[:2] 
                                             if (TARGET_ABS_MIN_CP <= cp <= TARGET_ABS_MAX_CP) or
                                                (-TARGET_ABS_MAX_CP <= cp <= -TARGET_ABS_MIN_CP))
