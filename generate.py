@@ -10,11 +10,11 @@ import math
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "engine", "stockfish-windows-x86-64-avx2.exe")
 
 # Paramètres d'analyse
-STOCKFISH_DEPTH = 26 # Correspond à la profondeur de votre dernière exécution
+STOCKFISH_DEPTH = 30 
 
-# PARAMÈTRES D'ÉVALUATION CIBLÉE (Avantage léger décisif)
-TARGET_ABS_MIN_CP = 30  
-TARGET_ABS_MAX_CP = 150 
+# NOUVEAUX PARAMÈTRES D'ÉVALUATION CIBLÉE (LÉGÈREMENT DÉSÉQUILIBRÉ MAIS JOUABLE)
+TARGET_ABS_MIN_CP = 25  # 0.25 pion
+TARGET_ABS_MAX_CP = 100 # 1.00 pion
 MAX_ATTEMPTS = 20000 
 
 # Déséquilibre Matériel Sévère (inchangé)
@@ -40,7 +40,7 @@ PIECES_TO_GENERATE = [
 
 def get_square_color(square: chess.Square) -> bool:
     """Détermine la couleur de la case (True pour clair, False pour sombre)."""
-    # La somme de la rangée et de la colonne donne la parité de la couleur de la case.
+    # Utilise la somme de la rangée et de la colonne pour déterminer la couleur de la case (méthode compatible).
     return (chess.square_rank(square) + chess.square_file(square)) % 2 == 0
 
 def generate_pure_random_fen():
@@ -146,7 +146,6 @@ def is_fen_legal(fen_and_board: tuple):
 # --- Fonctions de Vérification Matérielle (Inchangées) ---
 
 def calculate_material_value(board: chess.Board):
-    """Calcule la valeur matérielle totale pour chaque couleur."""
     white_material = 0
     black_material = 0
     for piece_type, value in MATERIAL_VALUES.items():
@@ -156,15 +155,12 @@ def calculate_material_value(board: chess.Board):
 
 
 def is_material_compensated(board: chess.Board, min_diff: float):
-    """Vérifie si la différence matérielle totale est suffisante."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
     return difference >= min_diff, white_mat, black_mat
 
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
-    """Vérifie s'il y a une différence nette d'au moins 1 pièce majeure/mineure."""
-    
     white_majors = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.WHITE))
     black_majors = len(board.pieces(chess.ROOK, chess.BLACK)) + len(board.pieces(chess.QUEEN, chess.BLACK))
     major_diff = abs(white_majors - black_majors)
@@ -178,24 +174,34 @@ def check_piece_difference(board: chess.Board, min_piece_diff: int):
     return False
 
 
-# --- Fonction d'Évaluation Stockfish (Stabilisée, Inchangée) ---
+# --- Fonction d'Évaluation Stockfish (MISES À JOUR pour multipv=2) ---
 
 def get_stockfish_evaluation(engine: chess.engine.SimpleEngine, fen: str):
-    """Obtient l'évaluation Stockfish pour une FEN donnée en utilisant le moteur PRÉ-OUVERT."""
+    """Obtient les deux premières évaluations (multipv=2) Stockfish pour une FEN donnée."""
     try:
         board = chess.Board(fen)
         
-        info = engine.analyse(board, chess.engine.Limit(depth=STOCKFISH_DEPTH))
-        score = info["score"].white() 
+        # Utiliser multipv=2 pour obtenir au moins deux lignes
+        info = engine.analyse(board, chess.engine.Limit(depth=STOCKFISH_DEPTH), multipv=2)
         
-        if score.is_mate():
-            evaluation_str = f"Mat en {score.mate()}"
-            evaluation_cp = 99999 if score.mate() > 0 else -99999
-        else:
-            evaluation_cp = score.cp
-            evaluation_str = f"{evaluation_cp / 100.0:+.2f} Pions"
+        scores_cp = []
+        scores_str = []
+        
+        # Extraire les scores des 2 meilleures lignes
+        for pv_info in info: 
+            score = pv_info["score"].white() 
             
-        return evaluation_str, evaluation_cp
+            if score.is_mate():
+                evaluation_cp = 99999 if score.mate() > 0 else -99999
+                evaluation_str = f"Mat en {score.mate()}"
+            else:
+                evaluation_cp = score.cp
+                evaluation_str = f"{evaluation_cp / 100.0:+.2f} Pions"
+            
+            scores_cp.append(evaluation_cp)
+            scores_str.append(evaluation_str)
+
+        return scores_cp, scores_str
         
     except Exception as e:
         return None, None 
@@ -209,8 +215,8 @@ if __name__ == "__main__":
     tentatives = 0
     engine = None 
     
-    print("--- Générateur de Déséquilibre Matériel SÉVÈRE avec Avantage Léger Décisif (Optimisation à la source) ---")
-    print(f"Objectif : Évaluation [{-TARGET_ABS_MAX_CP/100:.2f} à -{-TARGET_ABS_MIN_CP/100:.2f}] OU [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}].")
+    print("--- Générateur de Déséquilibre Matériel SÉVÈRE avec double Ligne d'Analyse (Optimisé) ---")
+    print(f"Objectif : **AU MOINS 2 LIGNES** évaluées dans la plage [{-TARGET_ABS_MAX_CP/100:.2f} à -{-TARGET_ABS_MIN_CP/100:.2f}] OU [{TARGET_ABS_MIN_CP/100:.2f} à {TARGET_ABS_MAX_CP/100:.2f}].")
     print(f"Critères : (Matériel Total >= {MIN_MATERIAL_DIFFERENCE}) ET (Différence de Pièce Majeure/Mineure >= {MIN_PIECE_DIFFERENCE}).")
     print(f"**Contrainte** : Garantie de l'unicité de la couleur des Fous PAR LA GÉNÉRATION.")
     print(f"Profondeur d'analyse du script : {STOCKFISH_DEPTH} demi-coups.")
@@ -252,35 +258,43 @@ if __name__ == "__main__":
             
             if is_compensated_mat and is_compensated_piece:
                 
-                # 4. Évaluation Stockfish (lent)
-                evaluation_str, evaluation_cp = get_stockfish_evaluation(engine, fen)
+                # 4. Évaluation Stockfish (multipv=2)
+                evaluation_cps, evaluation_strs = get_stockfish_evaluation(engine, fen)
                 
-                # --- LOGIQUE DE FILTRAGE : VÉRIFICATION DES DEUX PLAGES D'AVANTAGE ---
-                is_in_target_range = False
+                valid_lines_count = 0
                 
-                if evaluation_cp is not None:
-                    # Plage Avantage Blanc (+0.30 à +1.50)
-                    if TARGET_ABS_MIN_CP <= evaluation_cp <= TARGET_ABS_MAX_CP:
-                        is_in_target_range = True
-                    # Plage Avantage Noir (-1.50 à -0.30)
-                    elif -TARGET_ABS_MAX_CP <= evaluation_cp <= -TARGET_ABS_MIN_CP:
-                        is_in_target_range = True
+                if evaluation_cps is not None and len(evaluation_cps) >= 2:
+                    
+                    # On vérifie si au moins 2 des lignes tombent dans la plage cible
+                    for cp_score in evaluation_cps[:2]: 
+                        
+                        # Plage Avantage Blanc (+0.25 à +1.00)
+                        in_white_range = TARGET_ABS_MIN_CP <= cp_score <= TARGET_ABS_MAX_CP
+                        # Plage Avantage Noir (-1.00 à -0.25)
+                        in_black_range = -TARGET_ABS_MAX_CP <= cp_score <= -TARGET_ABS_MIN_CP
+                        
+                        if in_white_range or in_black_range:
+                            valid_lines_count += 1
                 
-                if is_in_target_range:
+                
+                if valid_lines_count >= 2:
                     # 5. Succès ! Toutes les conditions sont remplies.
                     fen_trouvee = True
                     
                     print("\n" + "—" * 80)
-                    print("✅ POSITION ALÉATOIRE AVEC AVANTAGE LÉGER DÉCISIF TROUVÉE !")
+                    print("✅ POSITION AVEC DÉSÉQUILIBRE MATÉRIEL ET DOUBLE LIGNE JOUABLE TROUVÉE !")
                     print(f"FEN : {fen}")
                     print(f"Matériel Blanc: {white_mat}, Matériel Noir: {black_mat}. Différence: {abs(white_mat - black_mat)} points.")
                     print(f"Tour au trait : {'Blanc' if board.turn == chess.WHITE else 'Noir'}")
-                    print(f"Évaluation Stockfish (dép. {STOCKFISH_DEPTH}) : {evaluation_str}")
+                    print(f"Évaluation Ligne 1 (dép. {STOCKFISH_DEPTH}) : {evaluation_strs[0]}")
+                    print(f"Évaluation Ligne 2 (dép. {STOCKFISH_DEPTH}) : {evaluation_strs[1]}")
                     print(f"Trouvé en {tentatives} tentatives (Temps écoulé : {time.time() - start_time:.2f}s)")
                     print("—" * 80)
                     
                 else:
-                    print(f"Tentative {tentatives}: Éval: {evaluation_str}. Retente...", end='\r')
+                    first_score = evaluation_strs[0] if evaluation_strs and len(evaluation_strs) > 0 else "N/A"
+                    second_score = evaluation_strs[1] if evaluation_strs and len(evaluation_strs) > 1 else "N/A"
+                    print(f"Tentative {tentatives}: Ligne 1: {first_score}, Ligne 2: {second_score}. Retente...", end='\r')
             
             else:
                 print(f"Tentative {tentatives}: Matériel insuffisant. Diff. Mat: {abs(white_mat - black_mat)}. Retente...", end='\r')
