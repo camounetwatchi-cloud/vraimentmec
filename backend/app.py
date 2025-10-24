@@ -2,18 +2,61 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import threading
 import queue
+import os
+
+# --- Imports pour la Base de Données (Ajoutés) ---
+from flask_sqlalchemy import SQLAlchemy
+from db_models import db, init_db # Import de la nouvelle logique BDD
+
+# --- Votre Logique Métier ---
 from chess_generator import generate_fen_position
 
 app = Flask(__name__)
 CORS(app)  # Permet les requêtes cross-origin
 
+# =========================================================
+# CONFIGURATION DE LA BASE DE DONNÉES (POUR AWS RDS)
+# =========================================================
+
+# 1. Lecture des variables d'environnement (Définies dans Elastic Beanstalk)
+DB_HOST = os.environ.get('DB_HOST')
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_NAME = os.environ.get('DB_NAME')
+DB_PORT = 5432 # Port standard pour PostgreSQL
+
+# 2. Construction de l'URI de connexion
+if all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
+    # Exemple pour PostgreSQL (nécessite psycopg2-binary dans requirements.txt)
+    SQLALCHEMY_DATABASE_URI = (
+        f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
+    )
+    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Initialise la connexion et crée les tables si l'application s'exécute sur le serveur
+    init_db(app)
+    print(f"INFO: Connexion à la BDD RDS réussie sur {DB_HOST}")
+else:
+    # Utilisation d'une BDD SQLite locale pour le développement
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///local_chess_db.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    init_db(app)
+    print("ATTENTION: Variables AWS non trouvées. Utilisation de la base de données SQLite locale.")
+
+
 # Queue pour gérer les résultats des threads
 result_queue = queue.Queue()
+
+# =========================================================
+# ENDPOINTS FLASK
+# =========================================================
 
 @app.route('/')
 def home():
     return jsonify({
         "status": "online",
+        "database_connected": bool(DB_HOST),
         "message": "Chess FEN Generator API",
         "endpoints": {
             "/api/generate": "POST - Generate a chess position"
@@ -23,8 +66,9 @@ def home():
 @app.route('/api/generate', methods=['POST'])
 def generate():
     """Endpoint pour générer une position d'échecs"""
+    # Votre logique de génération reste la même
     try:
-        # Récupérer les paramètres optionnels
+        # ... (Votre code de génération non modifié) ...
         data = request.get_json() if request.is_json else {}
         
         target_min = data.get('target_min', 25)
@@ -76,14 +120,14 @@ def generate():
 def status():
     """Vérifie que le moteur Stockfish est disponible"""
     try:
-        import os
         from chess_generator import STOCKFISH_PATH
         
         exists = os.path.exists(STOCKFISH_PATH)
         
         return jsonify({
             "stockfish_available": exists,
-            "stockfish_path": STOCKFISH_PATH
+            "stockfish_path": STOCKFISH_PATH,
+            "db_host": DB_HOST if DB_HOST else "Non configuré"
         })
     except Exception as e:
         return jsonify({
@@ -91,7 +135,9 @@ def status():
             "error": str(e)
         })
 
+# La ligne ci-dessous n'est pas utilisée par gunicorn sur Elastic Beanstalk
 if __name__ == '__main__':
-    # ATTENTION : Si vous lancez avec 'flask run', cette ligne peut être ignorée.
-    # Cependant, si vous exécutez 'python backend/app.py', le debug sera actif.
+    # Lance la base de données en local si les variables d'environnement ne sont pas là
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
