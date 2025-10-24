@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur FEN d'Échecs</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>♟️ Générateur FEN d'Échecs</h1>
+            <p class="subtitle">Génération de positions d'échecs avec déséquilibre matériel contrôlé</p>
+        </header>
+
+        <main>
+            <div class="controls-section">
+                <h2>Paramètres</h2>
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="targetMin">Évaluation min (centipawns):</label>
+                        <input type="number" id="targetMin" value="25" min="0" max="500">
+                    </div>
+                    <div class="control-group">
+                        <label for="targetMax">Évaluation max (centipawns):</label>
+                        <input type="number" id="targetMax" value="100" min="0" max="500">
+                    </div>
+                    <div class="control-group">
+                        <label for="maxAttempts">Tentatives maximum:</label>
+                        <input type="number" id="maxAttempts" value="20000" min="1000" max="50000" step="1000">
+                    </div>
+                </div>
+                
+                <button id="generateBtn" class="generate-btn">
+                    <span id="btnText">🎲 Générer une position</span>
+                    <span id="btnLoader" class="loader" style="display: none;"></span>
+                </button>
+            </div>
+
+            <div id="status" class="status hidden"></div>
+
+            <div id="results" class="results hidden">
+                <h2>Résultats</h2>
+                <div class="result-card">
+                    <div class="result-item">
+                        <strong>FEN:</strong>
+                        <div class="fen-display">
+                            <code id="fenText"></code>
+                            <button class="copy-btn" onclick="copyFEN()">📋 Copier</button>
+                        </div>
+                    </div>
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <strong>Matériel Blanc:</strong>
+                            <span id="whiteMaterial"></span>
+                        </div>
+                        <div class="result-item">
+                            <strong>Matériel Noir:</strong>
+                            <span id="blackMaterial"></span>
+                        </div>
+                        <div class="result-item">
+                            <strong>Différence:</strong>
+                            <span id="materialDiff"></span>
+                        </div>
+                        <div class="result-item">
+                            <strong>Trait:</strong>
+                            <span id="turn"></span>
+                        </div>
+                        <div class="result-item">
+                            <strong>Éval Ligne 1:</strong>
+                            <span id="evalLine1"></span>
+                        </div>
+                        <div class="result-item">
+                            <strong>Éval Ligne 2:</strong>
+                            <span id="evalLine2"></span>
+                        </div>
+                        <div class="result-item">
+                            <strong>Tentatives:</strong>
+                            <span id="attempts"></span>
+                        </div>
+                        <div class="result-item">
+                            <strong>Temps:</strong>
+                            <span id="timeSeconds"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="actions">
+                        <a id="lichessLink" href="#" target="_blank" class="action-btn lichess-btn">
+                            📊 Analyser sur Lichess
+                        </a>
+                        <a id="chesscomLink" href="#" target="_blank" class="action-btn chesscom-btn">
+                            🔍 Voir sur Chess.com
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Propulsé par Stockfish • Backend Flask • Python Chess</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
