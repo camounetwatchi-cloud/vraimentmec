@@ -1,4 +1,5 @@
 Flask
-python-chess
-requests  # Souvent utile pour les requêtes HTTP
-Flask-CORS
+Flask-Cors
+Flask-SQLAlchemy
+psycopg2-binary
+gunicorn
