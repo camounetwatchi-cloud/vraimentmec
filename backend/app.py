@@ -92,4 +92,6 @@ def status():
         })
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # ATTENTION : Si vous lancez avec 'flask run', cette ligne peut être ignorée.
+    # Cependant, si vous exécutez 'python backend/app.py', le debug sera actif.
+    app.run(debug=True)
