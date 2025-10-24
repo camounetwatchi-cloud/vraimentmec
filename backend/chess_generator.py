@@ -4,8 +4,7 @@ import random
 import os
 import time
 
-STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "..", "stockfish", "stockfish-windows-x86-64-avx2.exe")
-
+STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "..", "engine", "stockfish-windows-x86-64-avx2.exe")
 STOCKFISH_DEPTH = 30
 STOCKFISH_TIME_LIMIT = 0.5
 
