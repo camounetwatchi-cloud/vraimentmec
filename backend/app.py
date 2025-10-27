@@ -8,7 +8,7 @@ import sys
 # --- IMPORTS CORRIGÉS ---
 # Puisque app.py, db_models.py, et chess_generator.py sont dans le même
 # dossier 'backend', on utilise un import direct sans le préfixe 'backend'.
-from db_models import db, init_db
+from .db_models import db, init_db
 from flask_sqlalchemy import SQLAlchemy 
 from chess_generator import generate_fen_position
 
