@@ -9,8 +9,8 @@ import sys
 # Puisque app.py, db_models.py, et chess_generator.py sont dans le même
 # dossier 'backend', on utilise un import direct sans le préfixe 'backend'.
 from .db_models import db, init_db
-from flask_sqlalchemy import SQLAlchemy 
-from chess_generator import generate_fen_position
+from flask_sqlalchemy import SQLAlchemy
+from .chess_generator import generate_fen_position # <--- CORRIGEZ CECI
 
 app = Flask(__name__)
 CORS(app)
@@ -146,13 +146,13 @@ def generate():
 
 @app.route('/api/status', methods=['GET'])
 def status():
-    """Vérifie que le moteur Stockfish est disponible"""
-    try:
-        # Import corrigé pour l'import local
-        from chess_generator import STOCKFISH_PATH
-        import platform
-        
-        exists = os.path.exists(STOCKFISH_PATH)
+    """Vérifie que le moteur Stockfish est disponible"""
+    try:
+        # Import corrigé pour l'import local
+        from .chess_generator import STOCKFISH_PATH # <--- CORRIGEZ AUSSI CELUI-CI
+        import platform
+        
+        exists = os.path.exists(STOCKFISH_PATH)
         
         return jsonify({
             "stockfish_available": exists,
