@@ -2,23 +2,21 @@ import chess
 import chess.engine
 import random
 import os
+import sys
 import time
-import platform
 
 # Détection automatique du système d'exploitation
-def get_stockfish_path():
-    """Retourne le bon chemin Stockfish selon l'OS"""
-    base_dir = os.path.dirname(os.path.dirname(__file__))
-    engine_dir = os.path.join(base_dir, "engine")
-    
-    if platform.system() == "Windows":
-        # Pour développement local sur Windows
-        return os.path.join(engine_dir, "stockfish-windows-x86-64-avx2.exe")
-    else:
-        # Pour production sur Linux (AWS)
-        return os.path.join(engine_dir, "stockfish")
+if os.name == 'nt':  # Windows
+    STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "..", "engine", "stockfish-windows-x86-64-avx2.exe")
+else:  # Linux/Unix (Elastic Beanstalk)
+    STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "..", "engine", "stockfish")
 
-STOCKFISH_PATH = get_stockfish_path()
+# Vérification au démarrage
+if not os.path.exists(STOCKFISH_PATH):
+    print(f"ATTENTION: Stockfish non trouvé à {STOCKFISH_PATH}", file=sys.stderr)
+else:
+    print(f"INFO: Stockfish trouvé à {STOCKFISH_PATH}", file=sys.stderr)
+
 STOCKFISH_DEPTH = 30
 STOCKFISH_TIME_LIMIT = 0.5
 
