@@ -1,19 +1,19 @@
-from flask import Flask, jsonify, request
+pythonfrom flask import Flask, jsonify, request
 from flask_cors import CORS
 import threading
 import queue
 import os
-import sys # Ajout pour les logs plus précis
+import sys
 
-# --- Imports pour la Base de Données (Ajoutés) ---
-from db_models import db, init_db
+# --- Imports pour la Base de Données ---
+from backend.db_models import db, init_db  # ← Modifié
 from flask_sqlalchemy import SQLAlchemy 
 
 # --- Votre Logique Métier ---
-from chess_generator import generate_fen_position
+from backend.chess_generator import generate_fen_position  # ← Modifié
 
 app = Flask(__name__)
-CORS(app)  # Permet les requêtes cross-origin
+CORS(app)
 
 # Variables globales pour la configuration
 DB_HOST = os.environ.get('DB_HOST')
