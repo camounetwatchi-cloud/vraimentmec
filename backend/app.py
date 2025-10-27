@@ -1,16 +1,14 @@
-pythonfrom flask import Flask, jsonify, request
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import threading
 import queue
 import os
 import sys
 
-# --- Imports pour la Base de Données ---
-from backend.db_models import db, init_db  # ← Modifié
+# --- Imports avec la structure backend ---
+from backend.db_models import db, init_db
 from flask_sqlalchemy import SQLAlchemy 
-
-# --- Votre Logique Métier ---
-from backend.chess_generator import generate_fen_position  # ← Modifié
+from backend.chess_generator import generate_fen_position
 
 app = Flask(__name__)
 CORS(app)
@@ -26,27 +24,21 @@ DB_PORT = 5432
 db_initialized = False
 db_init_lock = threading.Lock()
 
-# =========================================================
-# CONFIGURATION DE LA BASE DE DONNÉES
-# =========================================================
-
 def configure_db(app):
     """Configure l'URI de la base de données."""
     if all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
-        # URI pour PostgreSQL RDS
         SQLALCHEMY_DATABASE_URI = (
             f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
         )
         app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
         print(f"INFO: Tentative de connexion à RDS sur {DB_HOST}", file=sys.stderr)
     else:
-        # URI pour SQLite locale (Fallback)
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///local_chess_db.db'
         print("ATTENTION: Variables AWS non trouvées. Utilisation de SQLite locale.", file=sys.stderr)
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-configure_db(app) # Configure l'URI, mais n'appelle PAS init_db ici
+configure_db(app)
 
 def ensure_db_is_initialized():
     """Initialise la base de données de manière thread-safe."""
@@ -54,17 +46,12 @@ def ensure_db_is_initialized():
     with db_init_lock:
         if not db_initialized:
             try:
-                init_db(app) # Initialise l'instance db et crée les tables
+                init_db(app)
                 db_initialized = True
                 print("INFO: Initialisation de la BDD réussie.", file=sys.stderr)
             except Exception as e:
-                print(f"ERREUR BDD FATALE : {e}", file=sys.stderr)
-                # En production, il est préférable de crasher l'app si la BDD est vitale
-                raise Exception(f"Échec de l'initialisation de la base de données : {e}")
-
-# =========================================================
-# ENDPOINTS FLASK
-# =========================================================
+                print(f"ERREUR BDD : {e}", file=sys.stderr)
+                db_initialized = True  # Continue même si erreur DB
 
 @app.before_request
 def before_request():
@@ -72,7 +59,6 @@ def before_request():
     if not db_initialized:
         ensure_db_is_initialized()
 
-# Queue pour gérer les résultats des threads
 result_queue = queue.Queue()
 
 @app.route('/')
@@ -82,14 +68,14 @@ def home():
         "database_connected": db_initialized,
         "message": "Chess FEN Generator API",
         "endpoints": {
-            "/api/generate": "POST - Generate a chess position"
+            "/api/generate": "POST - Generate a chess position",
+            "/api/status": "GET - Check Stockfish status"
         }
     })
 
 @app.route('/api/generate', methods=['POST'])
 def generate():
     """Endpoint pour générer une position d'échecs"""
-    # Votre logique de génération reste la même
     try:
         data = request.get_json() if request.is_json else {}
         
@@ -97,10 +83,8 @@ def generate():
         target_max = data.get('target_max', 100)
         max_attempts = data.get('max_attempts', 20000)
         
-        # Lancer la génération dans un thread
         def run_generation():
             try:
-                # Assurez-vous que l'initialisation est faite avant d'utiliser la BDD dans un thread
                 if not db_initialized:
                    ensure_db_is_initialized()
                    
@@ -115,7 +99,7 @@ def generate():
         
         thread = threading.Thread(target=run_generation)
         thread.start()
-        thread.join(timeout=120)  # Timeout de 2 minutes
+        thread.join(timeout=120)
         
         if thread.is_alive():
             return jsonify({
@@ -146,13 +130,15 @@ def generate():
 def status():
     """Vérifie que le moteur Stockfish est disponible"""
     try:
-        from chess_generator import STOCKFISH_PATH
+        from backend.chess_generator import STOCKFISH_PATH
+        import platform
         
         exists = os.path.exists(STOCKFISH_PATH)
         
         return jsonify({
             "stockfish_available": exists,
             "stockfish_path": STOCKFISH_PATH,
+            "platform": platform.system(),
             "db_host": DB_HOST if DB_HOST else "Non configuré",
             "db_initialized": db_initialized
         })
@@ -163,9 +149,7 @@ def status():
             "db_initialized": db_initialized
         })
 
-# La ligne ci-dessous n'est pas utilisée par gunicorn sur Elastic Beanstalk
 if __name__ == '__main__':
-    # Initialisation locale uniquement
     with app.app_context():
         ensure_db_is_initialized()
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
