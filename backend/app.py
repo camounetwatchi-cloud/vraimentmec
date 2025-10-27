@@ -5,10 +5,12 @@ import queue
 import os
 import sys
 
-# --- Imports avec la structure backend ---
-from backend.db_models import db, init_db
+# --- IMPORTS CORRIGÉS ---
+# Puisque app.py, db_models.py, et chess_generator.py sont dans le même
+# dossier 'backend', on utilise un import direct sans le préfixe 'backend'.
+from db_models import db, init_db
 from flask_sqlalchemy import SQLAlchemy 
-from backend.chess_generator import generate_fen_position
+from chess_generator import generate_fen_position
 
 app = Flask(__name__)
 CORS(app)
@@ -86,8 +88,8 @@ def generate():
         def run_generation():
             try:
                 if not db_initialized:
-                   ensure_db_is_initialized()
-                   
+                    ensure_db_is_initialized()
+                    
                 result = generate_fen_position(
                     target_min=target_min,
                     target_max=target_max,
@@ -130,7 +132,8 @@ def generate():
 def status():
     """Vérifie que le moteur Stockfish est disponible"""
     try:
-        from backend.chess_generator import STOCKFISH_PATH
+        # Import corrigé pour l'import local
+        from chess_generator import STOCKFISH_PATH
         import platform
         
         exists = os.path.exists(STOCKFISH_PATH)
