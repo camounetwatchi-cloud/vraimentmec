@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, session # Ajout de 'session'
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -12,9 +12,20 @@ import sys
 from .db_models import db, init_db
 from .chess_generator import generate_fen_position
 from .socket_manager import Game, MatchmakingManager, games
+from .auth import auth_bp # Import du blueprint d'authentification
 
 # --- CONFIGURATION INITIALE (Identique) ---
 app = Flask(__name__)
+
+# --- CONFIGURATION DE SESSIONS ET BLUEPRINT D'AUTHENTIFICATION (MODIFICATIONS) ---
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['SESSION_COOKIE_SECURE'] = False  # Mettre à True en production avec HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Enregistrer le blueprint d'authentification
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
+# ---------------------------------------------------------------------------------
 
 # Activez CORS pour les WebSockets (important pour le frontend)
 # Permettre les WebSockets de toutes les origines (*) pour les tests.
@@ -90,6 +101,7 @@ def home():
         "database_connected": db_initialized,
         "message": "Chess FEN Generator API with WebSockets",
         "endpoints": {
+            "/api/auth": "Blueprint pour l'authentification (Connexion/Inscription)",
             "/api/generate": "POST - Generate a chess position (HTTP)",
             "WebSocket": "Connect to start real-time game events"
         }
