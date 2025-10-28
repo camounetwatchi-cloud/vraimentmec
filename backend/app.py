@@ -1,305 +1,332 @@
-# -*- coding: utf-8 -*-
-from flask import Flask, jsonify, request, session
-from flask_cors import CORS
-# L'importation de SQLAlchemy est supprimée d'ici, car db_models.py s'en charge
-from flask_socketio import SocketIO, emit, join_room, leave_room
-import threading
-import queue
-import os
-import sys
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+import uuid
+from flask_sqlalchemy import SQLAlchemy
 
-# Importez la logique de gestion des événements et des salles
-# 'db' et 'init_db' viennent maintenant de db_models.py
-from .db_models import db, init_db
-from .chess_generator import generate_fen_position
-from .socket_manager import Game, MatchmakingManager, games
-from .auth import auth_bp # Import du blueprint d'authentification
+# Déclarer l'objet 'db' (sans l'initialiser tout de suite)
+db = SQLAlchemy()
 
-# --- CONFIGURATION INITIALE ---
-app = Flask(__name__)
+def init_db(app):
+    """
+    Initialise l'objet db avec l'application Flask.
+    Cette fonction sera appelée depuis app.py pour finaliser l'initialisation.
+    """
+    db.init_app(app)
 
-# --- CONFIGURATION DE SESSIONS ET BLUEPRINT D'AUTHENTIFICATION ---
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['SESSION_COOKIE_SECURE'] = False  # Mettre à True en production avec HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# Enregistrer le blueprint d'authentification
-app.register_blueprint(auth_bp, url_prefix='/api/auth')
-# ---------------------------------------------------------------------------------
-
-# Activez CORS
-CORS(app, resources={r"/*": {"origins": "*"}}) 
-
-# Configurez Flask-SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent') 
-
-# Variables globales pour la configuration
-DB_HOST = os.environ.get('DB_HOST', '').strip()
-DB_USER = os.environ.get('DB_USER', '').strip()
-DB_PASSWORD = os.environ.get('DB_PASSWORD', '').strip()
-DB_NAME = os.environ.get('DB_NAME', '').strip()
-DB_PORT = 5432
-
-# Drapeau et Lock pour garantir l'initialisation unique de la base de données
-db_initialized = False
-db_init_lock = threading.Lock()
-
-def configure_db(app):
-    """Configure l'URI de la base de données."""
-    if all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
-        from urllib.parse import quote_plus
-        safe_password = quote_plus(DB_PASSWORD)
+class User(db.Model):
+    """
+    Modèle utilisateur avec authentification et statistiques de jeu.
+    """
+    __tablename__ = 'users'
+    
+    # Identifiants
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    
+    # Statistiques de jeu
+    elo_rating = db.Column(db.Integer, default=1200, nullable=False)
+    games_played = db.Column(db.Integer, default=0, nullable=False)
+    games_won = db.Column(db.Integer, default=0, nullable=False)
+    games_drawn = db.Column(db.Integer, default=0, nullable=False)
+    
+    # Horodatages
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_login = db.Column(db.DateTime)
+    
+    # Statut
+    is_online = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Relations
+    games_as_white = db.relationship(
+        'GameHistory', 
+        foreign_keys='GameHistory.white_player_id', 
+        backref='white_player',
+        lazy='dynamic'
+    )
+    games_as_black = db.relationship(
+        'GameHistory', 
+        foreign_keys='GameHistory.black_player_id', 
+        backref='black_player',
+        lazy='dynamic'
+    )
+    
+    def set_password(self, password):
+        """
+        Hash et stocke le mot de passe de manière sécurisée.
         
-        SQLALCHEMY_DATABASE_URI = (
-            f'postgresql://{DB_USER}:{safe_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
-        )
-        app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-        print(f"INFO: Tentative de connexion à RDS sur {DB_HOST}", file=sys.stderr)
-    else:
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///local_chess_db.db'
-        print("ATTENTION: Variables AWS non trouvées. Utilisation de SQLite locale.", file=sys.stderr)
-
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# La configuration de la BDD doit se faire avant son initialisation
-configure_db(app)
-
-def ensure_db_is_initialized():
-    """Initialise la base de données de manière thread-safe."""
-    global db_initialized
-    with db_init_lock:
-        if not db_initialized:
-            try:
-                if 'sqlite' not in app.config['SQLALCHEMY_DATABASE_URI'] and not all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
-                    print("ERREUR BDD : Variables de connexion manquantes pour RDS.", file=sys.stderr)
-                    db_initialized = True
-                    return
-
-                # 1. Initialise l'objet 'db' avec l'application
-                init_db(app)
-                
-                # 2. (MODIFICATION) Crée les tables (User, GameHistory) si elles n'existent pas
-                # Nécessite le contexte de l'application pour fonctionner
-                with app.app_context():
-                    db.create_all()
-                    
-                db_initialized = True
-                print("INFO: Initialisation de la BDD et création des tables réussies.", file=sys.stderr)
-            except Exception as e:
-                print(f"ERREUR BDD : Échec de l'initialisation ou de la connexion. {e}", file=sys.stderr)
-                db_initialized = True
-
-@app.before_request
-def before_request():
-    """S'assure que la base de données est initialisée avant chaque requête."""
-    if not db_initialized:
-        ensure_db_is_initialized()
-
-result_queue = queue.Queue()
-
-# --- POINTS D'ACCÈS HTTP ---
-
-@app.route('/')
-def home():
-    return jsonify({
-        "status": "online",
-        "database_connected": db_initialized,
-        "message": "Chess FEN Generator API with WebSockets",
-        "endpoints": {
-            "/api/auth": "Blueprint pour l'authentification (Connexion/Inscription)",
-            "/api/generate": "POST - Generate a chess position (HTTP)",
-            "WebSocket": "Connect to start real-time game events"
+        Args:
+            password: Mot de passe en clair
+        """
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """
+        Vérifie si le mot de passe fourni correspond au hash stocké.
+        
+        Args:
+            password: Mot de passe en clair à vérifier
+            
+        Returns:
+            bool: True si le mot de passe est correct
+        """
+        return check_password_hash(self.password_hash, password)
+    
+    def get_win_rate(self):
+        """
+        Calcule le taux de victoire de l'utilisateur.
+        
+        Returns:
+            float: Pourcentage de victoires (0-100)
+        """
+        if self.games_played == 0:
+            return 0.0
+        return round((self.games_won / self.games_played) * 100, 2)
+    
+    def get_loss_count(self):
+        """
+        Calcule le nombre de défaites.
+        
+        Returns:
+            int: Nombre de parties perdues
+        """
+        return self.games_played - self.games_won - self.games_drawn
+    
+    def update_stats(self, result):
+        """
+        Met à jour les statistiques après une partie.
+        
+        Args:
+            result: 'win', 'loss', ou 'draw'
+        """
+        self.games_played += 1
+        
+        if result == 'win':
+            self.games_won += 1
+        elif result == 'draw':
+            self.games_drawn += 1
+    
+    def to_dict(self, include_email=False):
+        """
+        Convertit l'utilisateur en dictionnaire.
+        
+        Args:
+            include_email: Si True, inclut l'email (données sensibles)
+            
+        Returns:
+            dict: Représentation de l'utilisateur
+        """
+        data = {
+            'id': self.id,
+            'username': self.username,
+            'elo': self.elo_rating,
+            'games_played': self.games_played,
+            'games_won': self.games_won,
+            'games_drawn': self.games_drawn,
+            'games_lost': self.get_loss_count(),
+            'win_rate': self.get_win_rate(),
+            'is_online': self.is_online,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None
         }
-    })
-
-@app.route('/api/generate', methods=['POST'])
-def generate():
-    # Logique de génération FEN inchangée (HTTP)
-    try:
-        data = request.get_json() if request.is_json else {}
         
-        target_min = data.get('target_min', 25)
-        target_max = data.get('target_max', 100)
-        max_attempts = data.get('max_attempts', 20000)
+        if include_email:
+            data['email'] = self.email
         
-        def run_generation():
-            try:
-                if not db_initialized:
-                    ensure_db_is_initialized()
-                    
-                result = generate_fen_position(
-                    target_min=target_min,
-                    target_max=target_max,
-                    max_attempts=max_attempts
-                )
-                result_queue.put(result)
-            except Exception as e:
-                result_queue.put({"error": str(e)})
-        
-        thread = threading.Thread(target=run_generation)
-        thread.start()
-        thread.join(timeout=120)
-        
-        if thread.is_alive():
-            return jsonify({
-                "success": False,
-                "error": "Timeout: La génération a pris trop de temps"
-            }), 408
-        
-        result = result_queue.get()
-        
-        if "error" in result:
-            return jsonify({
-                "success": False,
-                "error": result["error"]
-            }), 500
-        
-        return jsonify({
-            "success": True,
-            "data": result
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-@app.route('/api/status', methods=['GET'])
-def status():
-    # Logique de statut inchangée
-    try:
-        from .chess_generator import STOCKFISH_PATH
-        import platform
-        
-        exists = os.path.exists(STOCKFISH_PATH)
-        
-        return jsonify({
-            "stockfish_available": exists,
-            "stockfish_path": STOCKFISH_PATH,
-            "platform": platform.system(),
-            "db_host": DB_HOST if DB_HOST else "Non configuré",
-            "db_initialized": db_initialized
-        })
-    except Exception as e:
-        return jsonify({
-            "stockfish_available": False,
-            "error": str(e),
-            "db_initialized": db_initialized
-        })
-
-# --- GESTION DES ÉVÉNEMENTS SOCKETIO (Temps Réel) ---
-
-@socketio.on('connect')
-def handle_connect():
-    """Gère la connexion initiale d'un client WebSocket."""
-    print(f"Client connecté: {request.sid}")
+        return data
     
-    # NOTE: Ceci doit être mis à jour pour utiliser l'authentification (session['user_id'])
-    # Pour l'instant, on utilise des placeholders
-    user_id_placeholder = session.get('user_id', request.sid) # Utilise le user_id ou le sid
-    username_placeholder = session.get('username', 'Visiteur')
-    
-    # Tentative d'ajouter le joueur à la file d'attente
-    MatchmakingManager.add_player(request.sid, user_id_placeholder, username_placeholder)
+    def __repr__(self):
+        return f'<User {self.username} (ELO: {self.elo_rating})>'
 
-    # Vérifie si un match a été trouvé immédiatement
-    game_id = MatchmakingManager.check_for_match(request.sid)
+
+class GameHistory(db.Model):
+    """
+    Modèle pour l'historique des parties jouées.
+    """
+    __tablename__ = 'game_history'
     
-    if game_id:
-        game = games[game_id]
+    # Identifiant
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    
+    # Joueurs
+    white_player_id = db.Column(
+        db.String(36), 
+        db.ForeignKey('users.id'), 
+        nullable=False,
+        index=True
+    )
+    black_player_id = db.Column(
+        db.String(36), 
+        db.ForeignKey('users.id'), 
+        nullable=False,
+        index=True
+    )
+    
+    # Données de la partie
+    starting_fen = db.Column(db.String(255), nullable=False)
+    final_fen = db.Column(db.String(255))
+    moves = db.Column(db.Text)  # Coups au format UCI séparés par des espaces
+    
+    # Résultat
+    result = db.Column(db.String(20), nullable=False, index=True)
+    # Valeurs possibles: 'white_win', 'black_win', 'draw', 'abandoned'
+    
+    # Horodatages
+    started_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    ended_at = db.Column(db.DateTime)
+    duration_seconds = db.Column(db.Integer)
+    
+    def get_winner_id(self):
+        """
+        Retourne l'ID du gagnant.
         
-        # Info de la partie pour les deux joueurs
-        game_info = game.get_game_info()
-        
-        # Envoie l'événement à tous les joueurs de la salle
-        for sid in game.players:
-            socketio.emit('match_found', 
-                {
-                    'game_info': game_info,
-                    'color': game.get_player_color(sid) # Couleur spécifique à ce joueur
-                }, 
-                room=sid) # Envoie en privé à chaque joueur
-    else:
-        # Envoie un message privé au client
-        emit('status', {'message': 'En attente d\'un adversaire...'}, room=request.sid)
-
-
-@socketio.on('move')
-def handle_move(data):
-    """Gère les mouvements de pièces reçus des clients."""
-    game_id = data.get('game_id')
-    uci_move = data.get('move') # Renommé en uci_move pour plus de clarté
+        Returns:
+            str or None: ID du gagnant, ou None en cas de nulle/abandon
+        """
+        if self.result == 'white_win':
+            return self.white_player_id
+        elif self.result == 'black_win':
+            return self.black_player_id
+        return None
     
-    if not game_id or game_id not in games:
-        emit('error', {'message': 'Partie invalide.'})
-        return
+    def get_loser_id(self):
+        """
+        Retourne l'ID du perdant.
         
-    game = games[game_id]
+        Returns:
+            str or None: ID du perdant, ou None en cas de nulle/abandon
+        """
+        if self.result == 'white_win':
+            return self.black_player_id
+        elif self.result == 'black_win':
+            return self.white_player_id
+        return None
     
-    # Vérifier si le joueur est authentifié pour ce mouvement (sécurité)
-    if request.sid not in game.players:
-        emit('error', {'message': 'Vous n\'êtes pas joueur dans cette partie.'})
-        return
-
-    try:
-        # Tente de faire le mouvement
-        new_fen, status, move_info = game.make_move(request.sid, uci_move)
+    def get_moves_list(self):
+        """
+        Retourne la liste des coups.
         
-        # Envoie le nouveau FEN et le statut à TOUS les clients de cette partie
-        socketio.emit('game_update', 
-            {
-                'fen': new_fen, 
-                'last_move': uci_move, 
-                'status': status,
-                'move_info': move_info # Contient le résultat, etc.
-            }, 
-            room=game_id)
-            
-        # Si la partie est terminée, on la retire de la mémoire (après un délai?)
-        if move_info.get('result'): # Si un résultat est défini
-            MatchmakingManager.remove_game(game_id)
-
-    except ValueError as e:
-        # Si le mouvement est invalide (pas au joueur de jouer, mouvement illégal)
-        emit('error', {'message': str(e)})
-
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    """Gère la déconnexion d'un client WebSocket."""
-    print(f"Client déconnecté: {request.sid}")
+        Returns:
+            list: Liste des coups au format UCI
+        """
+        if not self.moves:
+            return []
+        return self.moves.split()
     
-    # 1. Retirer le joueur de la file d'attente (gère aussi l'abandon)
-    MatchmakingManager.remove_player(request.sid)
-    
-    # 2. Gérer l'abandon (c'est maintenant géré dans remove_player -> handle_player_disconnect)
-    game_id = Matchror.find_game_by_player_id(request.sid)
-    if game_id and game_id in games:
-        game = games[game_id]
-        opponent_sid = game.get_opponent_id(request.sid)
+    def get_move_count(self):
+        """
+        Retourne le nombre de coups joués.
         
-        # Informe l'adversaire de l'abandon
-        if opponent_sid:
-            socketio.emit('opponent_left', 
-                {'message': 'Votre adversaire a quitté la partie. Vous gagnez par abandon.'}, 
-                room=opponent_sid)
-            
-        # Nettoie la partie (maintenant géré par remove_player)
-        # MatchmakingManager.remove_game(game_id)
+        Returns:
+            int: Nombre de coups
+        """
+        return len(self.get_moves_list())
+    
+    def to_dict(self):
+        """
+        Convertit la partie en dictionnaire.
+        
+        Returns:
+            dict: Représentation de la partie
+        """
+        return {
+            'id': self.id,
+            'white_player': {
+                'id': self.white_player_id,
+                'username': self.white_player.username if self.white_player else None
+            },
+            'black_player': {
+                'id': self.black_player_id,
+                'username': self.black_player.username if self.black_player else None
+            },
+            'starting_fen': self.starting_fen,
+            'final_fen': self.final_fen,
+            'moves': self.get_moves_list(),
+            'move_count': self.get_move_count(),
+            'result': self.result,
+            'winner_id': self.get_winner_id(),
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'ended_at': self.ended_at.isoformat() if self.ended_at else None,
+            'duration_seconds': self.duration_seconds
+        }
+    
+    def __repr__(self):
+        white_name = self.white_player.username if self.white_player else 'Unknown'
+        black_name = self.black_player.username if self.black_player else 'Unknown'
+        return f'<Game {white_name} vs {black_name} ({self.result})>'
 
 
-# --- POINT D'ENTRÉE PRINCIPAL ---
-
-if __name__ == '__main__':
-    # Initialise la BDD et crée les tables au démarrage
+# Fonction utilitaire pour créer toutes les tables
+def create_tables(app):
+    """
+    Crée toutes les tables dans la base de données.
+    À appeler au démarrage de l'application.
+    
+    Args:
+        app: Instance de l'application Flask
+    """
     with app.app_context():
-        ensure_db_is_initialized()
-        
-    # IMPORTANT: Utiliser socketio.run()
-    print("Démarrage du serveur SocketIO sur http://0.0.0.0:5000")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+        db.create_all()
+        print("Tables de base de données créées avec succès!")
 
-# Pour que Elastic Beanstalk (qui utilise WSGI) trouve votre application
-application = app
+
+# Fonction utilitaire pour supprimer toutes les tables (DANGER!)
+def drop_tables(app):
+    """
+    Supprime toutes les tables de la base de données.
+    ATTENTION: Cette opération est irréversible!
+    
+    Args:
+        app: Instance de l'application Flask
+    """
+    with app.app_context():
+        db.drop_all()
+        print("Toutes les tables ont été supprimées!")
+
+
+# Fonction utilitaire pour obtenir des statistiques globales
+def get_global_stats():
+    """
+    Récupère les statistiques globales de la plateforme.
+    
+    Returns:
+        dict: Statistiques globales
+    """
+    total_users = User.query.count()
+    total_games = GameHistory.query.count()
+    online_users = User.query.filter_by(is_online=True).count()
+    
+    return {
+        'total_users': total_users,
+        'total_games': total_games,
+        'online_users': online_users
+    }
+
+
+# Fonction utilitaire pour obtenir le classement
+def get_leaderboard(limit=10):
+    """
+    Récupère le classement des meilleurs joueurs.
+    
+    Args:
+        limit: Nombre de joueurs à retourner
+        
+    Returns:
+        list: Liste des meilleurs joueurs
+    """
+    top_players = User.query.order_by(User.elo_rating.desc()).limit(limit).all()
+    
+    leaderboard = []
+    for rank, player in enumerate(top_players, start=1):
+        leaderboard.append({
+            'rank': rank,
+            'username': player.username,
+            'elo': player.elo_rating,
+            'games_played': player.games_played,
+            'games_won': player.games_won,
+            'win_rate': player.get_win_rate()
+        })
+    
+    return leaderboard
