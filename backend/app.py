@@ -1,41 +1,44 @@
 # -*- coding: utf-8 -*-
-# NOTE: L'ERREUR PRINCIPALE A ÉTÉ CORRIGÉE.
-# Toutes les indentations (espaces invisibles 'U+00A0') ont été remplacées par des espaces standard.
-
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from flask_socketio import SocketIO, emit, join_room, leave_room
 import threading
 import queue
 import os
 import sys
 
-# --- IMPORTS CORRIGÉS ---
-# Puisque app.py, db_models.py, et chess_generator.py sont dans le même
-# dossier 'backend', on utilise un import direct sans le préfixe 'backend'.
+# Importez la logique de gestion des événements et des salles
 from .db_models import db, init_db
-from flask_sqlalchemy import SQLAlchemy
-from .chess_generator import generate_fen_position # <--- Import relatif correct
+from .chess_generator import generate_fen_position
+from .socket_manager import Game, MatchmakingManager, games
 
+# --- CONFIGURATION INITIALE (Identique) ---
 app = Flask(__name__)
-CORS(app)
+
+# Activez CORS pour les WebSockets (important pour le frontend)
+# Permettre les WebSockets de toutes les origines (*) pour les tests.
+CORS(app, resources={r"/*": {"origins": "*"}}) 
+
+# Configurez Flask-SocketIO
+# async_mode='gevent' est recommandé pour le scaling sur Beanstalk.
+# Permet à l'ALB (Load Balancer) de gérer les connexions persistantes.
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent') 
 
 # Variables globales pour la configuration
-# Utilisez .strip() pour éviter les problèmes avec les espaces blancs accidentels.
 DB_HOST = os.environ.get('DB_HOST', '').strip()
 DB_USER = os.environ.get('DB_USER', '').strip()
 DB_PASSWORD = os.environ.get('DB_PASSWORD', '').strip()
 DB_NAME = os.environ.get('DB_NAME', '').strip()
 DB_PORT = 5432
 
-# Drapeau pour garantir l'initialisation unique de la base de données
+# Drapeau et Lock pour garantir l'initialisation unique de la base de données
 db_initialized = False
 db_init_lock = threading.Lock()
 
 def configure_db(app):
     """Configure l'URI de la base de données."""
-    # Le test 'if all(...)' doit toujours utiliser les variables nettoyées (.strip())
     if all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
-        # Encode le mot de passe dans l'URI pour les caractères spéciaux si nécessaire
         from urllib.parse import quote_plus
         safe_password = quote_plus(DB_PASSWORD)
         
@@ -58,7 +61,6 @@ def ensure_db_is_initialized():
     with db_init_lock:
         if not db_initialized:
             try:
-                # Vérification supplémentaire pour s'assurer que nous n'essayons pas d'initialiser une DB si les variables manquent
                 if 'sqlite' not in app.config['SQLALCHEMY_DATABASE_URI'] and not all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
                     print("ERREUR BDD : Variables de connexion manquantes pour RDS.", file=sys.stderr)
                     db_initialized = True
@@ -68,11 +70,7 @@ def ensure_db_is_initialized():
                 db_initialized = True
                 print("INFO: Initialisation de la BDD réussie.", file=sys.stderr)
             except Exception as e:
-                # Si l'initialisation échoue (ex: mauvaise connexion, DB non créée)
                 print(f"ERREUR BDD : Échec de l'initialisation ou de la connexion. {e}", file=sys.stderr)
-                # Nous laissons db_initialized à False si l'erreur vient d'une tentative de connexion RDS
-                # Pour qu'elle puisse potentiellement réessayer ou afficher un état non connecté.
-                # Cependant, pour éviter une boucle, conservons db_initialized = True pour le moment.
                 db_initialized = True
 
 @app.before_request
@@ -83,21 +81,23 @@ def before_request():
 
 result_queue = queue.Queue()
 
+# --- POINTS D'ACCÈS HTTP (Identique) ---
+
 @app.route('/')
 def home():
     return jsonify({
         "status": "online",
         "database_connected": db_initialized,
-        "message": "Chess FEN Generator API",
+        "message": "Chess FEN Generator API with WebSockets",
         "endpoints": {
-            "/api/generate": "POST - Generate a chess position",
-            "/api/status": "GET - Check Stockfish status"
+            "/api/generate": "POST - Generate a chess position (HTTP)",
+            "WebSocket": "Connect to start real-time game events"
         }
     })
 
 @app.route('/api/generate', methods=['POST'])
 def generate():
-    """Endpoint pour générer une position d'échecs"""
+    # Logique de génération FEN inchangée (HTTP)
     try:
         data = request.get_json() if request.is_json else {}
         
@@ -150,10 +150,9 @@ def generate():
 
 @app.route('/api/status', methods=['GET'])
 def status():
-    """Vérifie que le moteur Stockfish est disponible"""
+    # Logique de statut inchangée
     try:
-        # Import corrigé pour l'import local
-        from .chess_generator import STOCKFISH_PATH # <--- Import relatif correct
+        from .chess_generator import STOCKFISH_PATH
         import platform
         
         exists = os.path.exists(STOCKFISH_PATH)
@@ -172,7 +171,96 @@ def status():
             "db_initialized": db_initialized
         })
 
+# --- GESTION DES ÉVÉNEMENTS SOCKETIO (Temps Réel) ---
+
+@socketio.on('connect')
+def handle_connect():
+    """Gère la connexion initiale d'un client WebSocket."""
+    # Le 'request.sid' est l'ID de session unique pour SocketIO
+    print(f"Client connecté: {request.sid}")
+    
+    # Tentative d'ajouter le joueur à la file d'attente
+    MatchmakingManager.add_player(request.sid)
+
+    # Vérifie si un match a été trouvé immédiatement
+    game_id = MatchmakingManager.check_for_match(request.sid)
+    
+    if game_id:
+        game = games[game_id]
+        
+        # Envoie l'événement à tous les joueurs de la salle
+        socketio.emit('match_found', 
+            {'game_id': game_id, 'fen': game.fen, 'color': game.get_player_color(request.sid)}, 
+            room=game_id)
+    else:
+        # Envoie un message privé au client
+        emit('status', {'message': 'En attente d\'un adversaire...'}, room=request.sid)
+
+
+@socketio.on('move')
+def handle_move(data):
+    """Gère les mouvements de pièces reçus des clients."""
+    game_id = data.get('game_id')
+    move = data.get('move')
+    
+    if not game_id or game_id not in games:
+        emit('error', {'message': 'Partie invalide.'})
+        return
+        
+    game = games[game_id]
+    player_color = game.get_player_color(request.sid)
+
+    try:
+        # Tente de faire le mouvement (logique dans socket_manager.py)
+        new_fen, status = game.make_move(request.sid, move)
+        
+        # Envoie le nouveau FEN et le statut à TOUS les clients de cette partie (y compris celui qui a joué)
+        socketio.emit('game_update', 
+            {'fen': new_fen, 'last_move': move, 'status': status}, 
+            room=game_id)
+            
+        # Si la partie est terminée (échec et mat, pat, etc.), on la retire de la mémoire
+        if status not in ['running', 'check']:
+            MatchmakingManager.remove_game(game_id)
+
+    except ValueError as e:
+        # Si le mouvement est invalide (pas au joueur de jouer, mouvement illégal)
+        emit('error', {'message': str(e)})
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Gère la déconnexion d'un client WebSocket."""
+    print(f"Client déconnecté: {request.sid}")
+    
+    # 1. Retirer le joueur de la file d'attente si il y était
+    MatchmakingManager.remove_player(request.sid)
+    
+    # 2. Gérer l'abandon d'une partie en cours
+    game_id = MatchmakingManager.find_game_by_player_id(request.sid)
+    if game_id and game_id in games:
+        game = games[game_id]
+        opponent_sid = game.get_opponent_id(request.sid)
+        
+        # Informe l'adversaire de l'abandon
+        socketio.emit('opponent_left', 
+            {'message': 'Votre adversaire a quitté la partie. Vous gagnez par abandon.'}, 
+            room=opponent_sid)
+            
+        # Nettoie la partie
+        MatchmakingManager.remove_game(game_id)
+
+
+# --- POINT D'ENTRÉE PRINCIPAL (Utilise socketio.run) ---
+
 if __name__ == '__main__':
     with app.app_context():
         ensure_db_is_initialized()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # IMPORTANT: Utiliser socketio.run() au lieu de app.run()
+    # pour démarrer le serveur SocketIO/WebSocket.
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+
+# Pour que Elastic Beanstalk (qui utilise WSGI) trouve votre application,
+# le fichier doit contenir un objet `application`.
+# Nous assignons l'objet Flask standard.
+application = app
