@@ -1,6 +1,16 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import uuid
+# >>> AJOUTER CETTE LIGNE
+from flask_sqlalchemy import SQLAlchemy 
+
+# >>> DÉCLARER L'OBJET 'db' ICI (sans l'initialiser tout de suite)
+db = SQLAlchemy() 
+
+def init_db(app):
+    """Initialise l'objet db avec l'application Flask."""
+    # La fonction init_db sera appelée depuis app.py pour finaliser l'initialisation.
+    db.init_app(app)
 
 class User(db.Model):
     """Modèle utilisateur avec authentification"""
@@ -41,3 +51,8 @@ class GameHistory(db.Model):
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     ended_at = db.Column(db.DateTime)
     duration_seconds = db.Column(db.Integer)
+
+    # Note: Vous avez une erreur dans votre socket_manager.py qui importe:
+    # from .db_models import User
+    # Cette approche est correcte car elle n'importe pas 'db'.
+    # Si le socket_manager essayait d'importer 'db', il faudrait aussi l'ajouter dans la liste d'imports.
