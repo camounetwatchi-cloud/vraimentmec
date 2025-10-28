@@ -4,3 +4,6 @@ Flask-SQLAlchemy
 psycopg2-binary
 gunicorn
 python-chess
+Flask-SocketIO
+gevent
+gevent-websocket
