@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# NOTE: L'ERREUR PRINCIPALE A ÉTÉ CORRIGÉE.
+# Toutes les indentations (espaces invisibles 'U+00A0') ont été remplacées par des espaces standard.
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import threading
@@ -10,7 +14,7 @@ import sys
 # dossier 'backend', on utilise un import direct sans le préfixe 'backend'.
 from .db_models import db, init_db
 from flask_sqlalchemy import SQLAlchemy
-from .chess_generator import generate_fen_position # <--- CORRIGEZ CECI
+from .chess_generator import generate_fen_position # <--- Import relatif correct
 
 app = Flask(__name__)
 CORS(app)
@@ -56,9 +60,9 @@ def ensure_db_is_initialized():
             try:
                 # Vérification supplémentaire pour s'assurer que nous n'essayons pas d'initialiser une DB si les variables manquent
                 if 'sqlite' not in app.config['SQLALCHEMY_DATABASE_URI'] and not all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
-                     print("ERREUR BDD : Variables de connexion manquantes pour RDS.", file=sys.stderr)
-                     db_initialized = True
-                     return
+                    print("ERREUR BDD : Variables de connexion manquantes pour RDS.", file=sys.stderr)
+                    db_initialized = True
+                    return
 
                 init_db(app)
                 db_initialized = True
@@ -69,7 +73,7 @@ def ensure_db_is_initialized():
                 # Nous laissons db_initialized à False si l'erreur vient d'une tentative de connexion RDS
                 # Pour qu'elle puisse potentiellement réessayer ou afficher un état non connecté.
                 # Cependant, pour éviter une boucle, conservons db_initialized = True pour le moment.
-                db_initialized = True 
+                db_initialized = True
 
 @app.before_request
 def before_request():
@@ -146,13 +150,13 @@ def generate():
 
 @app.route('/api/status', methods=['GET'])
 def status():
-    """Vérifie que le moteur Stockfish est disponible"""
-    try:
-        # Import corrigé pour l'import local
-        from .chess_generator import STOCKFISH_PATH # <--- CORRIGEZ AUSSI CELUI-CI
-        import platform
-        
-        exists = os.path.exists(STOCKFISH_PATH)
+    """Vérifie que le moteur Stockfish est disponible"""
+    try:
+        # Import corrigé pour l'import local
+        from .chess_generator import STOCKFISH_PATH # <--- Import relatif correct
+        import platform
+        
+        exists = os.path.exists(STOCKFISH_PATH)
         
         return jsonify({
             "stockfish_available": exists,
