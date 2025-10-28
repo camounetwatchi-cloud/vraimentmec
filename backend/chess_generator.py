@@ -4,18 +4,34 @@ import random
 import os
 import sys
 import time
+from pathlib import Path
+
+# --- CORRECTION CRITIQUE DU CHEMIN ---
+# Définir le chemin de base comme la racine du projet (un niveau au-dessus de 'backend')
+# Path(__file__).parent.parent donne le chemin du dossier 'vraimentmec'
+BASE_DIR = Path(__file__).parent.parent
 
 # Détection automatique du système d'exploitation
-if os.name == 'nt':  # Windows
-    STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "..", "engine", "stockfish-windows-x86-64-avx2.exe")
+if os.name == 'nt':  # Windows (pour votre développement local)
+    # Cherche le binaire Windows dans 'stockfish/' (si vous l'avez mis là)
+    # Si vous l'avez dans 'engine/', modifiez 'stockfish' par 'engine'
+    STOCKFISH_EXECUTABLE = "stockfish-windows-x86-64-avx2.exe"
+    STOCKFISH_PATH = BASE_DIR / "stockfish" / STOCKFISH_EXECUTABLE
 else:  # Linux/Unix (Elastic Beanstalk)
-    STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "..", "engine", "stockfish")
+    # Cherche le binaire Linux dans 'stockfish/' avec le nom exact que vous avez ajouté
+    STOCKFISH_EXECUTABLE = "stockfish-ubuntu-x86-64-avx2"
+    STOCKFISH_PATH = BASE_DIR / "stockfish" / STOCKFISH_EXECUTABLE
+
+# Convertir l'objet Path en chaîne de caractères pour l'API de Stockfish
+STOCKFISH_PATH = str(STOCKFISH_PATH)
 
 # Vérification au démarrage
 if not os.path.exists(STOCKFISH_PATH):
     print(f"ATTENTION: Stockfish non trouvé à {STOCKFISH_PATH}", file=sys.stderr)
 else:
     print(f"INFO: Stockfish trouvé à {STOCKFISH_PATH}", file=sys.stderr)
+
+# --- FIN DE LA CORRECTION CRITIQUE ---
 
 STOCKFISH_DEPTH = 30
 STOCKFISH_TIME_LIMIT = 0.5
@@ -32,6 +48,23 @@ MATERIAL_VALUES = {
     chess.QUEEN: 9,
 }
 
+# --- Initialisation du moteur Stockfish (à l'extérieur de la fonction generate_fen_position) ---
+# On tente de l'initialiser une fois pour toutes.
+engine = None
+try:
+    if os.path.exists(STOCKFISH_PATH):
+        # Utilisation de SimpleEngine.popen_uci pour l'initialisation
+        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+        # Définir les options du moteur (si nécessaire, mais souvent non nécessaire pour SimpleEngine)
+        # engine.configure({"Threads": 2, "Hash": 1024}) 
+    else:
+        print("ERREUR FATALE: Le moteur Stockfish n'existe pas ou le chemin est incorrect.", file=sys.stderr)
+except Exception as e:
+    print(f"ERREUR lors de l'initialisation de l'Engine Stockfish: {e}", file=sys.stderr)
+    engine = None
+
+# --- Reste des fonctions (inchangées, sauf l'appel à l'engine) ---
+
 def generate_pieces_with_imbalance():
     """Génère une liste de pièces garantissant un déséquilibre matériel."""
     strong_side_material = random.randint(17, 22)
@@ -41,7 +74,7 @@ def generate_pieces_with_imbalance():
     pieces_weak = []
     
     for pieces_list, target_material in [(pieces_strong, strong_side_material), 
-                                          (pieces_weak, weak_side_material)]:
+                                         (pieces_weak, weak_side_material)]:
         current = 0
         available = [chess.QUEEN, chess.ROOK, chess.ROOK, chess.BISHOP, chess.BISHOP,
                      chess.KNIGHT, chess.KNIGHT, chess.PAWN, chess.PAWN, chess.PAWN,
@@ -143,9 +176,9 @@ def is_fen_legal(fen_and_board: tuple):
 def calculate_material_value(board: chess.Board):
     """Calcule valeur matérielle par couleur."""
     white_material = sum(len(board.pieces(pt, chess.WHITE)) * val 
-                        for pt, val in MATERIAL_VALUES.items())
+                         for pt, val in MATERIAL_VALUES.items())
     black_material = sum(len(board.pieces(pt, chess.BLACK)) * val 
-                        for pt, val in MATERIAL_VALUES.items())
+                         for pt, val in MATERIAL_VALUES.items())
     return white_material, black_material
 
 def is_material_compensated(board: chess.Board, min_diff: float):
@@ -170,54 +203,69 @@ def check_piece_difference(board: chess.Board, min_piece_diff: int):
     
     return major_diff >= min_piece_diff or minor_diff >= min_piece_diff
 
-def get_stockfish_evaluation_batch(engine: chess.engine.SimpleEngine, fens: list):
+def get_stockfish_evaluation_batch(fens: list):
     """Évalue plusieurs positions en batch."""
+    # Utilise l'objet engine initialisé globalement
+    if not engine:
+        return [(None, None)] * len(fens)
+
     results = []
-    for fen in fens:
-        try:
-            board = chess.Board(fen)
-            info = engine.analyse(board, 
-                                 chess.engine.Limit(depth=STOCKFISH_DEPTH, 
-                                                   time=STOCKFISH_TIME_LIMIT),
-                                 multipv=2)
-            
-            if len(info) < 2:
-                results.append((None, None))
-                continue
-            
-            scores_cp = []
-            scores_str = []
-            
-            for pv_info in info:
-                score = pv_info["score"].white()
-                if score.is_mate():
-                    evaluation_cp = 99999 if score.mate() > 0 else -99999
-                    evaluation_str = f"Mat en {score.mate()}"
-                else:
-                    evaluation_cp = score.cp
-                    evaluation_str = f"{evaluation_cp / 100.0:+.2f}"
-                
-                scores_cp.append(evaluation_cp)
-                scores_str.append(evaluation_str)
-            
-            results.append((scores_cp, scores_str))
-        except Exception:
-            results.append((None, None))
     
+    # Ouvrir l'engine de nouveau pour éviter les problèmes de timeout/thread (solution plus robuste)
+    temp_engine = None
+    try:
+        if os.path.exists(STOCKFISH_PATH):
+            temp_engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+        else:
+             print("Engine non trouvé pour l'analyse en batch.", file=sys.stderr)
+             return [(None, None)] * len(fens)
+             
+        for fen in fens:
+            try:
+                board = chess.Board(fen)
+                info = temp_engine.analyse(board, 
+                                          chess.engine.Limit(depth=STOCKFISH_DEPTH, 
+                                                             time=STOCKFISH_TIME_LIMIT),
+                                          multipv=2)
+                
+                if len(info) < 2:
+                    results.append((None, None))
+                    continue
+                
+                scores_cp = []
+                scores_str = []
+                
+                for pv_info in info:
+                    score = pv_info["score"].white()
+                    if score.is_mate():
+                        evaluation_cp = 99999 if score.mate() > 0 else -99999
+                        evaluation_str = f"Mat en {score.mate()}"
+                    else:
+                        evaluation_cp = score.cp
+                        evaluation_str = f"{evaluation_cp / 100.0:+.2f}"
+                    
+                    scores_cp.append(evaluation_cp)
+                    scores_str.append(evaluation_str)
+                
+                results.append((scores_cp, scores_str))
+            except Exception:
+                results.append((None, None))
+    finally:
+        if temp_engine:
+            temp_engine.quit()
+
     return results
 
 def generate_fen_position(target_min=25, target_max=100, max_attempts=20000):
     """Fonction principale appelée par l'API"""
-    engine = None
+    global engine
     start_time = time.time()
     tentatives = 0
     
+    if not engine:
+        raise Exception(f"Le moteur Stockfish n'est pas initialisé. Chemin: {STOCKFISH_PATH}")
+    
     try:
-        if not os.path.exists(STOCKFISH_PATH):
-            raise Exception(f"Stockfish non trouvé: {STOCKFISH_PATH}")
-        
-        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-        
         BATCH_SIZE = 5
         candidates_buffer = []
         
@@ -238,13 +286,15 @@ def generate_fen_position(target_min=25, target_max=100, max_attempts=20000):
                 
                 if len(candidates_buffer) >= BATCH_SIZE:
                     fens_to_analyze = [c[0] for c in candidates_buffer]
-                    results = get_stockfish_evaluation_batch(engine, fens_to_analyze)
+                    
+                    # On ne passe plus l'engine en paramètre
+                    results = get_stockfish_evaluation_batch(fens_to_analyze)
                     
                     for (fen, board, w_mat, b_mat), (scores_cp, scores_str) in zip(candidates_buffer, results):
                         if scores_cp and len(scores_cp) >= 2:
                             valid_count = sum(1 for cp in scores_cp[:2] 
-                                            if (target_min <= cp <= target_max) or
-                                               (-target_max <= cp <= -target_min))
+                                              if (target_min <= cp <= target_max) or
+                                                 (-target_max <= cp <= -target_min))
                             
                             if valid_count >= 2:
                                 return {
@@ -260,9 +310,11 @@ def generate_fen_position(target_min=25, target_max=100, max_attempts=20000):
                                 }
                     
                     candidates_buffer = []
-        
+            
         raise Exception("Position non trouvée après maximum de tentatives")
     
     finally:
-        if engine:
-            engine.quit()
+        # L'engine est géré par la fonction generate_fen_position si elle l'ouvre,
+        # mais ici on s'assure qu'il est fermé si une exception non gérée le laissait ouvert.
+        # Note: L'engine global n'est plus utilisé pour l'analyse pour la robustesse.
+        pass # La fermeture est maintenant dans get_stockfish_evaluation_batch
