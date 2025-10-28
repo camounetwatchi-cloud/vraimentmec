@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, jsonify, request, session # Ajout de 'session'
+from flask import Flask, jsonify, request, session
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
+# L'importation de SQLAlchemy est supprimée d'ici, car db_models.py s'en charge
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import threading
 import queue
@@ -9,15 +9,16 @@ import os
 import sys
 
 # Importez la logique de gestion des événements et des salles
+# 'db' et 'init_db' viennent maintenant de db_models.py
 from .db_models import db, init_db
 from .chess_generator import generate_fen_position
 from .socket_manager import Game, MatchmakingManager, games
 from .auth import auth_bp # Import du blueprint d'authentification
 
-# --- CONFIGURATION INITIALE (Identique) ---
+# --- CONFIGURATION INITIALE ---
 app = Flask(__name__)
 
-# --- CONFIGURATION DE SESSIONS ET BLUEPRINT D'AUTHENTIFICATION (MODIFICATIONS) ---
+# --- CONFIGURATION DE SESSIONS ET BLUEPRINT D'AUTHENTIFICATION ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SESSION_COOKIE_SECURE'] = False  # Mettre à True en production avec HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -27,13 +28,10 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 # ---------------------------------------------------------------------------------
 
-# Activez CORS pour les WebSockets (important pour le frontend)
-# Permettre les WebSockets de toutes les origines (*) pour les tests.
+# Activez CORS
 CORS(app, resources={r"/*": {"origins": "*"}}) 
 
 # Configurez Flask-SocketIO
-# async_mode='gevent' est recommandé pour le scaling sur Beanstalk.
-# Permet à l'ALB (Load Balancer) de gérer les connexions persistantes.
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent') 
 
 # Variables globales pour la configuration
@@ -64,6 +62,7 @@ def configure_db(app):
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# La configuration de la BDD doit se faire avant son initialisation
 configure_db(app)
 
 def ensure_db_is_initialized():
@@ -77,9 +76,16 @@ def ensure_db_is_initialized():
                     db_initialized = True
                     return
 
+                # 1. Initialise l'objet 'db' avec l'application
                 init_db(app)
+                
+                # 2. (MODIFICATION) Crée les tables (User, GameHistory) si elles n'existent pas
+                # Nécessite le contexte de l'application pour fonctionner
+                with app.app_context():
+                    db.create_all()
+                    
                 db_initialized = True
-                print("INFO: Initialisation de la BDD réussie.", file=sys.stderr)
+                print("INFO: Initialisation de la BDD et création des tables réussies.", file=sys.stderr)
             except Exception as e:
                 print(f"ERREUR BDD : Échec de l'initialisation ou de la connexion. {e}", file=sys.stderr)
                 db_initialized = True
@@ -92,7 +98,7 @@ def before_request():
 
 result_queue = queue.Queue()
 
-# --- POINTS D'ACCÈS HTTP (Identique) ---
+# --- POINTS D'ACCÈS HTTP ---
 
 @app.route('/')
 def home():
@@ -188,11 +194,15 @@ def status():
 @socketio.on('connect')
 def handle_connect():
     """Gère la connexion initiale d'un client WebSocket."""
-    # Le 'request.sid' est l'ID de session unique pour SocketIO
     print(f"Client connecté: {request.sid}")
     
+    # NOTE: Ceci doit être mis à jour pour utiliser l'authentification (session['user_id'])
+    # Pour l'instant, on utilise des placeholders
+    user_id_placeholder = session.get('user_id', request.sid) # Utilise le user_id ou le sid
+    username_placeholder = session.get('username', 'Visiteur')
+    
     # Tentative d'ajouter le joueur à la file d'attente
-    MatchmakingManager.add_player(request.sid)
+    MatchmakingManager.add_player(request.sid, user_id_placeholder, username_placeholder)
 
     # Vérifie si un match a été trouvé immédiatement
     game_id = MatchmakingManager.check_for_match(request.sid)
@@ -200,10 +210,17 @@ def handle_connect():
     if game_id:
         game = games[game_id]
         
+        # Info de la partie pour les deux joueurs
+        game_info = game.get_game_info()
+        
         # Envoie l'événement à tous les joueurs de la salle
-        socketio.emit('match_found', 
-            {'game_id': game_id, 'fen': game.fen, 'color': game.get_player_color(request.sid)}, 
-            room=game_id)
+        for sid in game.players:
+            socketio.emit('match_found', 
+                {
+                    'game_info': game_info,
+                    'color': game.get_player_color(sid) # Couleur spécifique à ce joueur
+                }, 
+                room=sid) # Envoie en privé à chaque joueur
     else:
         # Envoie un message privé au client
         emit('status', {'message': 'En attente d\'un adversaire...'}, room=request.sid)
@@ -213,26 +230,35 @@ def handle_connect():
 def handle_move(data):
     """Gère les mouvements de pièces reçus des clients."""
     game_id = data.get('game_id')
-    move = data.get('move')
+    uci_move = data.get('move') # Renommé en uci_move pour plus de clarté
     
     if not game_id or game_id not in games:
         emit('error', {'message': 'Partie invalide.'})
         return
         
     game = games[game_id]
-    player_color = game.get_player_color(request.sid)
+    
+    # Vérifier si le joueur est authentifié pour ce mouvement (sécurité)
+    if request.sid not in game.players:
+        emit('error', {'message': 'Vous n\'êtes pas joueur dans cette partie.'})
+        return
 
     try:
-        # Tente de faire le mouvement (logique dans socket_manager.py)
-        new_fen, status = game.make_move(request.sid, move)
+        # Tente de faire le mouvement
+        new_fen, status, move_info = game.make_move(request.sid, uci_move)
         
-        # Envoie le nouveau FEN et le statut à TOUS les clients de cette partie (y compris celui qui a joué)
+        # Envoie le nouveau FEN et le statut à TOUS les clients de cette partie
         socketio.emit('game_update', 
-            {'fen': new_fen, 'last_move': move, 'status': status}, 
+            {
+                'fen': new_fen, 
+                'last_move': uci_move, 
+                'status': status,
+                'move_info': move_info # Contient le résultat, etc.
+            }, 
             room=game_id)
             
-        # Si la partie est terminée (échec et mat, pat, etc.), on la retire de la mémoire
-        if status not in ['running', 'check']:
+        # Si la partie est terminée, on la retire de la mémoire (après un délai?)
+        if move_info.get('result'): # Si un résultat est défini
             MatchmakingManager.remove_game(game_id)
 
     except ValueError as e:
@@ -245,34 +271,35 @@ def handle_disconnect():
     """Gère la déconnexion d'un client WebSocket."""
     print(f"Client déconnecté: {request.sid}")
     
-    # 1. Retirer le joueur de la file d'attente si il y était
+    # 1. Retirer le joueur de la file d'attente (gère aussi l'abandon)
     MatchmakingManager.remove_player(request.sid)
     
-    # 2. Gérer l'abandon d'une partie en cours
-    game_id = MatchmakingManager.find_game_by_player_id(request.sid)
+    # 2. Gérer l'abandon (c'est maintenant géré dans remove_player -> handle_player_disconnect)
+    game_id = Matchror.find_game_by_player_id(request.sid)
     if game_id and game_id in games:
         game = games[game_id]
         opponent_sid = game.get_opponent_id(request.sid)
         
         # Informe l'adversaire de l'abandon
-        socketio.emit('opponent_left', 
-            {'message': 'Votre adversaire a quitté la partie. Vous gagnez par abandon.'}, 
-            room=opponent_sid)
+        if opponent_sid:
+            socketio.emit('opponent_left', 
+                {'message': 'Votre adversaire a quitté la partie. Vous gagnez par abandon.'}, 
+                room=opponent_sid)
             
-        # Nettoie la partie
-        MatchmakingManager.remove_game(game_id)
+        # Nettoie la partie (maintenant géré par remove_player)
+        # MatchmakingManager.remove_game(game_id)
 
 
-# --- POINT D'ENTRÉE PRINCIPAL (Utilise socketio.run) ---
+# --- POINT D'ENTRÉE PRINCIPAL ---
 
 if __name__ == '__main__':
+    # Initialise la BDD et crée les tables au démarrage
     with app.app_context():
         ensure_db_is_initialized()
-    # IMPORTANT: Utiliser socketio.run() au lieu de app.run()
-    # pour démarrer le serveur SocketIO/WebSocket.
+        
+    # IMPORTANT: Utiliser socketio.run()
+    print("Démarrage du serveur SocketIO sur http://0.0.0.0:5000")
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
 
-# Pour que Elastic Beanstalk (qui utilise WSGI) trouve votre application,
-# le fichier doit contenir un objet `application`.
-# Nous assignons l'objet Flask standard.
+# Pour que Elastic Beanstalk (qui utilise WSGI) trouve votre application
 application = app
