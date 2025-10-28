@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Échecs en ligne</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            max-width: 450px;
+            width: 100%;
+        }
+
+        .auth-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .auth-header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .auth-header p {
+            opacity: 0.9;
+        }
+
+        .auth-body {
+            padding: 40px 30px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .form-container {
+            display: none;
+        }
+
+        .form-container.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group input.error {
+            border-color: #f44336;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .password-strength {
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 5px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .password-strength.show {
+            display: block;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            transition: all 0.3s;
+            border-radius: 2px;
+        }
+
+        .password-strength.weak .password-strength-bar {
+            width: 33%;
+            background: #f44336;
+        }
+
+        .password-strength.medium .password-strength-bar {
+            width: 66%;
+            background: #ff9800;
+        }
+
+        .password-strength.strong .password-strength-bar {
+            width: 100%;
+            background: #4caf50;
+        }
+
+        .additional-links {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .additional-links a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .additional-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <h1>♟️ Échecs en ligne</h1>
+            <p>Jouez contre des adversaires du monde entier</p>
+        </div>
+
+        <div class="auth-body">
+            <div class="alert" id="alert"></div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('login')">Connexion</button>
+                <button class="tab" onclick="switchTab('register')">Inscription</button>
+            </div>
+
+            <!-- Formulaire de connexion -->
+            <div id="login-form" class="form-container active">
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="login-username">Username ou Email</label>
+                        <input type="text" id="login-username" required>
+                        <div class="error-message" id="login-username-error"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="login-password">Mot de passe</label>
+                        <input type="password" id="login-password" required>
+                        <div class="error-message" id="login-password-error"></div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="login-btn">
+                        Se connecter
+                    </button>
+                </form>
+
+                <div class="additional-links">
+                    <a href="index.html">← Retour à l'accueil</a>
+                </div>
+            </div>
+
+            <!-- Formulaire d'inscription -->
+            <div id="register-form" class="form-container">
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label for="register-username">Username</label>
+                        <input type="text" id="register-username" required minlength="3" maxlength="20">
+                        <div class="error-message" id="register-username-error"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" required>
+                        <div class="error-message" id="register-email-error"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="register-password">Mot de passe</label>
+                        <input type="password" id="register-password" required minlength="6" oninput="checkPasswordStrength()">
+                        <div class="password-strength" id="password-strength">
+                            <div class="password-strength-bar"></div>
+                        </div>
+                        <div class="error-message" id="register-password-error"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="register-password-confirm">Confirmer le mot de passe</label>
+                        <input type="password" id="register-password-confirm" required minlength="6">
+                        <div class="error-message" id="register-password-confirm-error"></div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="register-btn">
+                        S'inscrire
+                    </button>
+                </form>
+
+                <div class="additional-links">
+                    <a href="index.html">← Retour à l'accueil</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+
+        // Changement d'onglet
+        function switchTab(tab) {
+            // Mettre à jour les onglets
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Mettre à jour les formulaires
+            document.querySelectorAll('.form-container').forEach(f => f.classList.remove('active'));
+            document.getElementById(tab + '-form').classList.add('active');
+
+            // Cacher l'alerte
+            hideAlert();
+        }
+
+        // Afficher une alerte
+        function showAlert(message, type) {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = `alert ${type} show`;
+        }
+
+        // Cacher l'alerte
+        function hideAlert() {
+            const alert = document.getElementById('alert');
+            alert.classList.remove('show');
+        }
+
+        // Vérifier la force du mot de passe
+        function checkPasswordStrength() {
+            const password = document.getElementById('register-password').value;
+            const strengthDiv = document.getElementById('password-strength');
+
+            if (password.length === 0) {
+                strengthDiv.classList.remove('show', 'weak', 'medium', 'strong');
+                return;
+            }
+
+            strengthDiv.classList.add('show');
+            strengthDiv.classList.remove('weak', 'medium', 'strong');
+
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+            if (/\d/.test(password)) strength++;
+            if (/[^a-zA-Z\d]/.test(password)) strength++;
+
+            if (strength <= 1) {
+                strengthDiv.classList.add('weak');
+            } else if (strength <= 3) {
+                strengthDiv.classList.add('medium');
+            } else {
+                strengthDiv.classList.add('strong');
+            }
+        }
+
+        // Gérer la connexion
+        async function handleLogin(event) {
+            event.preventDefault();
+            hideAlert();
+
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            const btn = document.getElementById('login-btn');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Connexion en cours...<span class="loader"></span>';
+
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('✅ Connexion réussie ! Redirection...', 'success');
+                    
+                    // Sauvegarder les infos utilisateur
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    // Rediriger vers la page de jeu
+                    setTimeout(() => {
+                        window.location.href = 'game.html';
+                    }, 1000);
+                } else {
+                    showAlert('❌ ' + data.error, 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Se connecter';
+                }
+            } catch (error) {
+                showAlert('❌ Erreur de connexion au serveur', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Se connecter';
+            }
+        }
+
+        // Gérer l'inscription
+        async function handleRegister(event) {
+            event.preventDefault();
+            hideAlert();
+
+            const username = document.getElementById('register-username').value.trim();
+            const email = document.getElementById('register-email').value.trim();
+            const password = document.getElementById('register-password').value;
+            const passwordConfirm = document.getElementById('register-password-confirm').value;
+            const btn = document.getElementById('register-btn');
+
+            // Validation du mot de passe
+            if (password !== passwordConfirm) {
+                showAlert('❌ Les mots de passe ne correspondent pas', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = 'Inscription en cours...<span class="loader"></span>';
+
+            try {
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('✅ Inscription réussie ! Redirection...', 'success');
+                    
+                    // Sauvegarder les infos utilisateur
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    // Rediriger vers la page de jeu
+                    setTimeout(() => {
+                        window.location.href = 'game.html';
+                    }, 1000);
+                } else {
+                    showAlert('❌ ' + data.error, 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'S\'inscrire';
+                }
+            } catch (error) {
+                showAlert('❌ Erreur de connexion au serveur', 'error');
+                btn.disabled = false;
+                btn.textContent = 'S\'inscrire';
+            }
+        }
+
+        // Vérifier si déjà connecté au chargement
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_URL}/auth/me`, {
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Déjà connecté, rediriger
+                    window.location.href = 'game.html';
+                }
+            } catch (error) {
+                // Pas connecté, rester sur cette page
+            }
+        });
+    </script>
+</body>
+</html>
