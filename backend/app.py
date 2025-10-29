@@ -311,7 +311,7 @@ def handle_resign(data):
         
     except Exception as e:
         print(f"❌ Erreur dans resign: {e}")
-        emit('error', {'message': 'Erreur lors de l'abandon'})
+        emit('error', {'message': "Erreur lors de l'abandon"})
 
 @socketio.on('offer_draw')
 def handle_offer_draw(data):
