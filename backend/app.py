@@ -28,27 +28,42 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configuration de la session
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'votre-cle-secrete-super-securisee-changez-moi')
-app.config['SESSION_COOKIE_SECURE'] = False
+# --- MODIFICATION ---
+# En production (avec HTTPS), SESSION_COOKIE_SECURE devrait être True
+# Pour les tests locaux (http ou file://), False est OK.
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Changé pour permettre cross-origin
+app.config['SESSION_COOKIE_SAMESITE'] = 'None' # Nécessaire pour les cookies cross-origin
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # ========================================
 # CONFIGURATION CORS (CORRIGÉE)
 # ========================================
 
-# Configuration CORS pour permettre les requêtes cross-origin
-CORS(app, 
+# --- MODIFICATION ---
+# 1. Définir les origines autorisées.
+#    "*" est INTERDIT avec "supports_credentials=True".
+#    Nous devons lister explicitement toutes les origines autorisées.
+allowed_origins = [
+    "null",  # Pour les tests en local (file://...) - LA CORRECTION CLÉ
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    # L'URL de votre frontend déployé (ajoutez-la si elle est différente de l'API)
+    "http://chessishard-env.eba-msuf2pqs.eu-west-1.elasticbeanstalk.com" 
+]
+
+# 2. Appliquer la configuration CORS
+CORS(app,
      resources={
          r"/api/*": {
-             "origins": ["http://localhost:5000", "http://127.0.0.1:5000", "*"],
-             "supports_credentials": True,
-             "allow_headers": ["Content-Type", "Authorization"],
+             "origins": allowed_origins, # Utiliser la liste sans "*"
+             "supports_credentials": True, # C'est correct
+             "allow_headers": ["Content-Type", "Authorization"], # C'est correct
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
              "expose_headers": ["Content-Type"]
          }
-     },
-     supports_credentials=True)
+     })
+# J'ai supprimé 'supports_credentials=True' à l'extérieur car il est déjà dans 'resources'
 
 # ========================================
 # INITIALISATION
@@ -57,10 +72,11 @@ CORS(app,
 # Initialiser la base de données
 init_db(app)
 
-# Initialiser SocketIO avec gevent pour les WebSockets
-socketio = SocketIO(app, 
-                    cors_allowed_origins="*",
-                    async_mode='threading',  # Changé de 'gevent' à 'threading' pour compatibilité
+# --- MODIFICATION ---
+# Initialiser SocketIO avec la MÊME liste d'origines
+socketio = SocketIO(app,
+                    cors_allowed_origins=allowed_origins, # Utiliser la même liste
+                    async_mode='threading', # Changé de 'gevent' à 'threading' pour compatibilité
                     logger=True,
                     engineio_logger=True)
 
