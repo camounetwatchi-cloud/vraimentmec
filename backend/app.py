@@ -25,45 +25,39 @@ if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL or 'sqlite:///chess_app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 # Configuration de la session
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'votre-cle-secrete-super-securisee-changez-moi')
-# --- MODIFICATION ---
-# En production (avec HTTPS), SESSION_COOKIE_SECURE devrait être True
-# Pour les tests locaux (http ou file://), False est OK.
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None' # Nécessaire pour les cookies cross-origin
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # ========================================
-# CONFIGURATION CORS (CORRIGÉE)
+# CONFIGURATION CORS
 # ========================================
 
-# --- MODIFICATION ---
-# 1. Définir les origines autorisées.
-#    "*" est INTERDIT avec "supports_credentials=True".
-#    Nous devons lister explicitement toutes les origines autorisées.
 allowed_origins = [
-    "null",  # Pour les tests en local (file://...) - LA CORRECTION CLÉ
+    "null",
     "http://localhost:5000",
     "http://127.0.0.1:5000",
-    # L'URL de votre frontend déployé (ajoutez-la si elle est différente de l'API)
-    "http://chessishard-env.eba-msuf2pqs.eu-west-1.elasticbeanstalk.com" 
+    "http://chessishard-env.eba-msuf2pqs.eu-west-1.elasticbeanstalk.com"
 ]
 
-# 2. Appliquer la configuration CORS
 CORS(app,
      resources={
          r"/api/*": {
-             "origins": allowed_origins, # Utiliser la liste sans "*"
-             "supports_credentials": True, # C'est correct
-             "allow_headers": ["Content-Type", "Authorization"], # C'est correct
+             "origins": allowed_origins,
+             "supports_credentials": True,
+             "allow_headers": ["Content-Type", "Authorization"],
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
              "expose_headers": ["Content-Type"]
          }
      })
-# J'ai supprimé 'supports_credentials=True' à l'extérieur car il est déjà dans 'resources'
 
 # ========================================
 # INITIALISATION
@@ -72,18 +66,20 @@ CORS(app,
 # Initialiser la base de données
 init_db(app)
 
-# --- MODIFICATION (RETOUR À GEVENT) ---
-# Initialiser SocketIO avec la MÊME liste d'origines et gevent pour la production
+# Initialiser SocketIO
 socketio = SocketIO(app,
-                    cors_allowed_origins=allowed_origins, # Utiliser la même liste
-                    async_mode='gevent', # NÉCESSAIRE POUR LA PRODUCTION AVEC GUNICORN
+                    cors_allowed_origins=allowed_origins,
+                    async_mode='eventlet',
                     logger=True,
                     engineio_logger=True)
 
-# Créer les tables au démarrage
-with app.app_context():
-    create_tables(app)
-    print("✅ Tables créées avec succès!")
+# Créer les tables au démarrage - CORRECTION ICI
+try:
+    with app.app_context():
+        create_tables(app)
+        print("✅ Tables créées avec succès!")
+except Exception as e:
+    print(f"⚠️ Avertissement lors de la création des tables: {e}")
 
 # ========================================
 # ENREGISTREMENT DES BLUEPRINTS
@@ -383,17 +379,12 @@ def internal_error(error):
 # ========================================
 
 if __name__ == '__main__':
-    # Cette partie n'est utilisée que lorsque vous exécutez
-    # "python backend/app.py" localement.
-    # Gunicorn n'exécute pas ce bloc.
     port = int(os.environ.get('PORT', 5000))
-    print(f"🚀 Démarrage du serveur de DÉVELOPPEMENT sur le port {port}...")
+    print(f"🚀 Démarrage du serveur sur le port {port}...")
     
-    # Utiliser gevent localement pour simuler la production
     socketio.run(app, 
                  host='0.0.0.0', 
                  port=port, 
                  debug=True,
                  use_reloader=True,
                  allow_unsafe_werkzeug=True)
-
