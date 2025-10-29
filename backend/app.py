@@ -1,332 +1,418 @@
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
-import uuid
-from flask_sqlalchemy import SQLAlchemy
+import os
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room, leave_room
+from .db_models import db, init_db, create_tables
+from .auth import auth_bp
+from .chess_generator import generate_fen_position
+from .socket_manager import MatchmakingManager, games
 
-# Déclarer l'objet 'db' (sans l'initialiser tout de suite)
-db = SQLAlchemy()
+# Créer l'application Flask
+app = Flask(__name__)
 
-def init_db(app):
-    """
-    Initialise l'objet db avec l'application Flask.
-    Cette fonction sera appelée depuis app.py pour finaliser l'initialisation.
-    """
-    db.init_app(app)
+# Configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///chess.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SESSION_COOKIE_SECURE'] = False  # True en production avec HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Initialiser CORS
+CORS(app, supports_credentials=True, origins=['http://localhost:3000', 'http://localhost:5000'])
+
+# Initialiser la base de données
+init_db(app)
+
+# Initialiser SocketIO avec gevent
+socketio = SocketIO(
+    app,
+    cors_allowed_origins='*',
+    async_mode='gevent',
+    logger=True,
+    engineio_logger=True
+)
+
+# Créer les tables au démarrage
+with app.app_context():
+    create_tables(app)
+
+# Enregistrer les blueprints
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 
-class User(db.Model):
-    """
-    Modèle utilisateur avec authentification et statistiques de jeu.
-    """
-    __tablename__ = 'users'
-    
-    # Identifiants
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    username = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    
-    # Statistiques de jeu
-    elo_rating = db.Column(db.Integer, default=1200, nullable=False)
-    games_played = db.Column(db.Integer, default=0, nullable=False)
-    games_won = db.Column(db.Integer, default=0, nullable=False)
-    games_drawn = db.Column(db.Integer, default=0, nullable=False)
-    
-    # Horodatages
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    last_login = db.Column(db.DateTime)
-    
-    # Statut
-    is_online = db.Column(db.Boolean, default=False, nullable=False)
-    
-    # Relations
-    games_as_white = db.relationship(
-        'GameHistory', 
-        foreign_keys='GameHistory.white_player_id', 
-        backref='white_player',
-        lazy='dynamic'
-    )
-    games_as_black = db.relationship(
-        'GameHistory', 
-        foreign_keys='GameHistory.black_player_id', 
-        backref='black_player',
-        lazy='dynamic'
-    )
-    
-    def set_password(self, password):
-        """
-        Hash et stocke le mot de passe de manière sécurisée.
-        
-        Args:
-            password: Mot de passe en clair
-        """
-        self.password_hash = generate_password_hash(password)
-    
-    def check_password(self, password):
-        """
-        Vérifie si le mot de passe fourni correspond au hash stocké.
-        
-        Args:
-            password: Mot de passe en clair à vérifier
-            
-        Returns:
-            bool: True si le mot de passe est correct
-        """
-        return check_password_hash(self.password_hash, password)
-    
-    def get_win_rate(self):
-        """
-        Calcule le taux de victoire de l'utilisateur.
-        
-        Returns:
-            float: Pourcentage de victoires (0-100)
-        """
-        if self.games_played == 0:
-            return 0.0
-        return round((self.games_won / self.games_played) * 100, 2)
-    
-    def get_loss_count(self):
-        """
-        Calcule le nombre de défaites.
-        
-        Returns:
-            int: Nombre de parties perdues
-        """
-        return self.games_played - self.games_won - self.games_drawn
-    
-    def update_stats(self, result):
-        """
-        Met à jour les statistiques après une partie.
-        
-        Args:
-            result: 'win', 'loss', ou 'draw'
-        """
-        self.games_played += 1
-        
-        if result == 'win':
-            self.games_won += 1
-        elif result == 'draw':
-            self.games_drawn += 1
-    
-    def to_dict(self, include_email=False):
-        """
-        Convertit l'utilisateur en dictionnaire.
-        
-        Args:
-            include_email: Si True, inclut l'email (données sensibles)
-            
-        Returns:
-            dict: Représentation de l'utilisateur
-        """
-        data = {
-            'id': self.id,
-            'username': self.username,
-            'elo': self.elo_rating,
-            'games_played': self.games_played,
-            'games_won': self.games_won,
-            'games_drawn': self.games_drawn,
-            'games_lost': self.get_loss_count(),
-            'win_rate': self.get_win_rate(),
-            'is_online': self.is_online,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+# ============================================
+# ROUTES API REST
+# ============================================
+
+@app.route('/')
+def index():
+    """Page d'accueil de l'API"""
+    return jsonify({
+        'message': 'Chess Game API',
+        'version': '1.0.0',
+        'endpoints': {
+            'auth': '/api/auth/*',
+            'generate': '/api/generate',
+            'health': '/api/health'
         }
-        
-        if include_email:
-            data['email'] = self.email
-        
-        return data
-    
-    def __repr__(self):
-        return f'<User {self.username} (ELO: {self.elo_rating})>'
+    })
 
 
-class GameHistory(db.Model):
-    """
-    Modèle pour l'historique des parties jouées.
-    """
-    __tablename__ = 'game_history'
-    
-    # Identifiant
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    
-    # Joueurs
-    white_player_id = db.Column(
-        db.String(36), 
-        db.ForeignKey('users.id'), 
-        nullable=False,
-        index=True
-    )
-    black_player_id = db.Column(
-        db.String(36), 
-        db.ForeignKey('users.id'), 
-        nullable=False,
-        index=True
-    )
-    
-    # Données de la partie
-    starting_fen = db.Column(db.String(255), nullable=False)
-    final_fen = db.Column(db.String(255))
-    moves = db.Column(db.Text)  # Coups au format UCI séparés par des espaces
-    
-    # Résultat
-    result = db.Column(db.String(20), nullable=False, index=True)
-    # Valeurs possibles: 'white_win', 'black_win', 'draw', 'abandoned'
-    
-    # Horodatages
-    started_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    ended_at = db.Column(db.DateTime)
-    duration_seconds = db.Column(db.Integer)
-    
-    def get_winner_id(self):
-        """
-        Retourne l'ID du gagnant.
-        
-        Returns:
-            str or None: ID du gagnant, ou None en cas de nulle/abandon
-        """
-        if self.result == 'white_win':
-            return self.white_player_id
-        elif self.result == 'black_win':
-            return self.black_player_id
-        return None
-    
-    def get_loser_id(self):
-        """
-        Retourne l'ID du perdant.
-        
-        Returns:
-            str or None: ID du perdant, ou None en cas de nulle/abandon
-        """
-        if self.result == 'white_win':
-            return self.black_player_id
-        elif self.result == 'black_win':
-            return self.white_player_id
-        return None
-    
-    def get_moves_list(self):
-        """
-        Retourne la liste des coups.
-        
-        Returns:
-            list: Liste des coups au format UCI
-        """
-        if not self.moves:
-            return []
-        return self.moves.split()
-    
-    def get_move_count(self):
-        """
-        Retourne le nombre de coups joués.
-        
-        Returns:
-            int: Nombre de coups
-        """
-        return len(self.get_moves_list())
-    
-    def to_dict(self):
-        """
-        Convertit la partie en dictionnaire.
-        
-        Returns:
-            dict: Représentation de la partie
-        """
-        return {
-            'id': self.id,
-            'white_player': {
-                'id': self.white_player_id,
-                'username': self.white_player.username if self.white_player else None
-            },
-            'black_player': {
-                'id': self.black_player_id,
-                'username': self.black_player.username if self.black_player else None
-            },
-            'starting_fen': self.starting_fen,
-            'final_fen': self.final_fen,
-            'moves': self.get_moves_list(),
-            'move_count': self.get_move_count(),
-            'result': self.result,
-            'winner_id': self.get_winner_id(),
-            'started_at': self.started_at.isoformat() if self.started_at else None,
-            'ended_at': self.ended_at.isoformat() if self.ended_at else None,
-            'duration_seconds': self.duration_seconds
-        }
-    
-    def __repr__(self):
-        white_name = self.white_player.username if self.white_player else 'Unknown'
-        black_name = self.black_player.username if self.black_player else 'Unknown'
-        return f'<Game {white_name} vs {black_name} ({self.result})>'
+@app.route('/api/health')
+def health():
+    """Endpoint de santé pour vérifier que l'API fonctionne"""
+    return jsonify({
+        'status': 'healthy',
+        'database': 'connected',
+        'socketio': 'ready'
+    })
 
 
-# Fonction utilitaire pour créer toutes les tables
-def create_tables(app):
+@app.route('/api/generate', methods=['POST'])
+def generate_position():
     """
-    Crée toutes les tables dans la base de données.
-    À appeler au démarrage de l'application.
+    Endpoint pour générer une position d'échecs avec déséquilibre matériel.
     
-    Args:
-        app: Instance de l'application Flask
-    """
-    with app.app_context():
-        db.create_all()
-        print("Tables de base de données créées avec succès!")
-
-
-# Fonction utilitaire pour supprimer toutes les tables (DANGER!)
-def drop_tables(app):
-    """
-    Supprime toutes les tables de la base de données.
-    ATTENTION: Cette opération est irréversible!
-    
-    Args:
-        app: Instance de l'application Flask
-    """
-    with app.app_context():
-        db.drop_all()
-        print("Toutes les tables ont été supprimées!")
-
-
-# Fonction utilitaire pour obtenir des statistiques globales
-def get_global_stats():
-    """
-    Récupère les statistiques globales de la plateforme.
-    
-    Returns:
-        dict: Statistiques globales
-    """
-    total_users = User.query.count()
-    total_games = GameHistory.query.count()
-    online_users = User.query.filter_by(is_online=True).count()
-    
-    return {
-        'total_users': total_users,
-        'total_games': total_games,
-        'online_users': online_users
+    Body JSON:
+    {
+        "target_min": 25,
+        "target_max": 100,
+        "max_attempts": 20000
     }
-
-
-# Fonction utilitaire pour obtenir le classement
-def get_leaderboard(limit=10):
     """
-    Récupère le classement des meilleurs joueurs.
-    
-    Args:
-        limit: Nombre de joueurs à retourner
+    try:
+        data = request.get_json()
         
-    Returns:
-        list: Liste des meilleurs joueurs
-    """
-    top_players = User.query.order_by(User.elo_rating.desc()).limit(limit).all()
-    
-    leaderboard = []
-    for rank, player in enumerate(top_players, start=1):
-        leaderboard.append({
-            'rank': rank,
-            'username': player.username,
-            'elo': player.elo_rating,
-            'games_played': player.games_played,
-            'games_won': player.games_won,
-            'win_rate': player.get_win_rate()
+        target_min = data.get('target_min', 25)
+        target_max = data.get('target_max', 100)
+        max_attempts = data.get('max_attempts', 20000)
+        
+        # Validation des paramètres
+        if target_min >= target_max:
+            return jsonify({
+                'success': False,
+                'error': 'target_min doit être inférieur à target_max'
+            }), 400
+        
+        if max_attempts < 1000 or max_attempts > 50000:
+            return jsonify({
+                'success': False,
+                'error': 'max_attempts doit être entre 1000 et 50000'
+            }), 400
+        
+        # Générer la position
+        result = generate_fen_position(target_min, target_max, max_attempts)
+        
+        return jsonify({
+            'success': True,
+            'data': result
         })
+        
+    except Exception as e:
+        print(f"Erreur lors de la génération: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# ============================================
+# ÉVÉNEMENTS SOCKETIO
+# ============================================
+
+@socketio.on('connect')
+def handle_connect():
+    """Gère la connexion d'un client WebSocket"""
+    print(f"Client connecté: {request.sid}")
+    emit('connected', {'sid': request.sid})
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Gère la déconnexion d'un client WebSocket"""
+    print(f"Client déconnecté: {request.sid}")
     
-    return leaderboard
+    # Retirer le joueur de la file d'attente
+    MatchmakingManager.remove_player(request.sid)
+    
+    # Si le joueur était dans une partie, gérer l'abandon
+    game_id = MatchmakingManager.find_game_by_player_id(request.sid)
+    if game_id:
+        game = games.get(game_id)
+        if game:
+            opponent_sid = game.get_opponent_id(request.sid)
+            if opponent_sid:
+                emit('opponent_disconnected', {
+                    'message': 'Votre adversaire s\'est déconnecté'
+                }, room=opponent_sid)
+        
+        MatchmakingManager.handle_player_disconnect(request.sid, game_id)
+
+
+@socketio.on('join_queue')
+def handle_join_queue(data):
+    """
+    Gère l'entrée d'un joueur dans la file d'attente.
+    
+    Data attendu:
+    {
+        "user_id": "string",
+        "username": "string",
+        "elo": 1200
+    }
+    """
+    user_id = data.get('user_id')
+    username = data.get('username', 'Anonymous')
+    elo = data.get('elo', 1200)
+    
+    print(f"Joueur {username} rejoint la file d'attente")
+    
+    # Ajouter le joueur à la file d'attente
+    MatchmakingManager.add_player(request.sid, user_id, username, elo)
+    
+    # Notifier le joueur
+    emit('queue_joined', {
+        'message': 'Vous êtes dans la file d\'attente',
+        'waiting_players': MatchmakingManager.get_waiting_players_count()
+    })
+    
+    # Chercher un match
+    game_id = MatchmakingManager.check_for_match(request.sid)
+    
+    if game_id:
+        game = games[game_id]
+        
+        # Notifier les deux joueurs que la partie commence
+        for player_sid, player_data in game.players.items():
+            player_color = 'white' if player_data['color'] == True else 'black'
+            opponent_sid = game.get_opponent_id(player_sid)
+            opponent_data = game.get_player_info(opponent_sid)
+            
+            emit('game_start', {
+                'game_id': game_id,
+                'fen': game.fen,
+                'your_color': player_color,
+                'opponent': {
+                    'username': opponent_data['username'],
+                    'user_id': opponent_data['user_id']
+                },
+                'starting_fen': game.starting_fen
+            }, room=player_sid)
+        
+        print(f"Match trouvé ! Partie {game_id} créée")
+
+
+@socketio.on('leave_queue')
+def handle_leave_queue():
+    """Gère la sortie d'un joueur de la file d'attente"""
+    print(f"Joueur {request.sid} quitte la file d'attente")
+    MatchmakingManager.remove_player(request.sid)
+    
+    emit('queue_left', {
+        'message': 'Vous avez quitté la file d\'attente'
+    })
+
+
+@socketio.on('make_move')
+def handle_make_move(data):
+    """
+    Gère un coup joué par un joueur.
+    
+    Data attendu:
+    {
+        "game_id": "string",
+        "move": "e2e4" (format UCI)
+    }
+    """
+    game_id = data.get('game_id')
+    move_uci = data.get('move')
+    
+    if not game_id or not move_uci:
+        emit('error', {'message': 'game_id et move sont requis'})
+        return
+    
+    game = games.get(game_id)
+    
+    if not game:
+        emit('error', {'message': 'Partie introuvable'})
+        return
+    
+    try:
+        # Effectuer le mouvement
+        new_fen, status, info = game.make_move(request.sid, move_uci)
+        
+        # Notifier les deux joueurs du nouveau coup
+        emit('move_made', {
+            'fen': new_fen,
+            'move': move_uci,
+            'status': status,
+            'moves_count': info['moves_count']
+        }, room=game_id)
+        
+        # Si la partie est terminée
+        if status in ['checkmate', 'stalemate', 'draw_insufficient', 'draw_75_moves', 'draw_repetition']:
+            emit('game_over', {
+                'status': status,
+                'result': info.get('result'),
+                'winner': info.get('winner'),
+                'final_fen': new_fen
+            }, room=game_id)
+            
+            # Supprimer la partie après un délai
+            MatchmakingManager.remove_game(game_id)
+            
+    except ValueError as e:
+        emit('error', {'message': str(e)})
+    except Exception as e:
+        print(f"Erreur lors du mouvement: {e}")
+        emit('error', {'message': 'Erreur lors du mouvement'})
+
+
+@socketio.on('resign')
+def handle_resign(data):
+    """
+    Gère l'abandon d'un joueur.
+    
+    Data attendu:
+    {
+        "game_id": "string"
+    }
+    """
+    game_id = data.get('game_id')
+    
+    if not game_id:
+        emit('error', {'message': 'game_id requis'})
+        return
+    
+    game = games.get(game_id)
+    
+    if not game:
+        emit('error', {'message': 'Partie introuvable'})
+        return
+    
+    # Déterminer le gagnant
+    resigning_player = game.get_player_info(request.sid)
+    if resigning_player:
+        if resigning_player['color']:  # WHITE
+            result = 'black_win'
+        else:
+            result = 'white_win'
+        
+        # Sauvegarder la partie
+        game.save_to_database(result)
+        
+        # Notifier les joueurs
+        emit('game_over', {
+            'status': 'resignation',
+            'result': result,
+            'resigning_player': resigning_player['username']
+        }, room=game_id)
+        
+        # Supprimer la partie
+        MatchmakingManager.remove_game(game_id)
+
+
+@socketio.on('request_draw')
+def handle_request_draw(data):
+    """
+    Gère une demande de nulle.
+    
+    Data attendu:
+    {
+        "game_id": "string"
+    }
+    """
+    game_id = data.get('game_id')
+    
+    if not game_id:
+        emit('error', {'message': 'game_id requis'})
+        return
+    
+    game = games.get(game_id)
+    
+    if not game:
+        emit('error', {'message': 'Partie introuvable'})
+        return
+    
+    # Notifier l'adversaire
+    opponent_sid = game.get_opponent_id(request.sid)
+    requesting_player = game.get_player_info(request.sid)
+    
+    emit('draw_offered', {
+        'from_player': requesting_player['username']
+    }, room=opponent_sid)
+
+
+@socketio.on('accept_draw')
+def handle_accept_draw(data):
+    """
+    Gère l'acceptation d'une nulle.
+    
+    Data attendu:
+    {
+        "game_id": "string"
+    }
+    """
+    game_id = data.get('game_id')
+    
+    if not game_id:
+        emit('error', {'message': 'game_id requis'})
+        return
+    
+    game = games.get(game_id)
+    
+    if not game:
+        emit('error', {'message': 'Partie introuvable'})
+        return
+    
+    # Sauvegarder la partie comme nulle
+    game.save_to_database('draw')
+    
+    # Notifier les joueurs
+    emit('game_over', {
+        'status': 'draw_agreement',
+        'result': 'draw'
+    }, room=game_id)
+    
+    # Supprimer la partie
+    MatchmakingManager.remove_game(game_id)
+
+
+@socketio.on('decline_draw')
+def handle_decline_draw(data):
+    """
+    Gère le refus d'une nulle.
+    
+    Data attendu:
+    {
+        "game_id": "string"
+    }
+    """
+    game_id = data.get('game_id')
+    
+    if not game_id:
+        emit('error', {'message': 'game_id requis'})
+        return
+    
+    game = games.get(game_id)
+    
+    if not game:
+        emit('error', {'message': 'Partie introuvable'})
+        return
+    
+    # Notifier l'adversaire
+    opponent_sid = game.get_opponent_id(request.sid)
+    
+    emit('draw_declined', {
+        'message': 'Votre adversaire a refusé la nulle'
+    }, room=opponent_sid)
+
+
+# ============================================
+# POINT D'ENTRÉE
+# ============================================
+
+if __name__ == '__main__':
+    # Lancer le serveur en mode développement
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
