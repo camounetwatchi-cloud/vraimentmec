@@ -1,11 +1,11 @@
+psycopg2-binary
 Flask==3.0.0
 Flask-Cors==4.0.0
 Flask-SQLAlchemy==3.1.1
-psycopg2-binary
-gunicorn==21.2.0
-python-chess==1.999
 Flask-SocketIO==5.3.5
 python-socketio==5.10.0
+python-chess==1.999
+gunicorn==21.2.0
 eventlet==0.33.3
+gevent==24.2.1
 Werkzeug==3.0.1
-gevent
