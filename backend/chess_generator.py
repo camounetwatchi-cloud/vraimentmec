@@ -7,29 +7,30 @@ import time
 from pathlib import Path
 
 # --- CORRECTION CRITIQUE DU CHEMIN ---
-# Définir le chemin de base comme la racine du projet (un niveau au-dessus de 'backend')
-# Path(__file__).parent.parent donne le chemin du dossier 'vraimentmec'
 BASE_DIR = Path(__file__).parent.parent
 
-# Détection automatique du système d'exploitation
-if os.name == 'nt':  # Windows (pour votre développement local)
-    # Cherche le binaire Windows dans 'stockfish/' (si vous l'avez mis là)
-    # Si vous l'avez dans 'engine/', modifiez 'stockfish' par 'engine'
+if os.name == 'nt':  # Windows
     STOCKFISH_EXECUTABLE = "stockfish-windows-x86-64-avx2.exe"
     STOCKFISH_PATH = BASE_DIR / "stockfish" / STOCKFISH_EXECUTABLE
-else:  # Linux/Unix (Elastic Beanstalk)
-    # Cherche le binaire Linux dans 'stockfish/' avec le nom exact que vous avez ajouté
-    STOCKFISH_EXECUTABLE = "stockfish-ubuntu-x86-64-avx2"
+else:  # Linux/Unix
+    STOCKFISH_EXECUTABLE = "stockfish"  # NOM SIMPLIFIÉ
     STOCKFISH_PATH = BASE_DIR / "stockfish" / STOCKFISH_EXECUTABLE
 
-# Convertir l'objet Path en chaîne de caractères pour l'API de Stockfish
 STOCKFISH_PATH = str(STOCKFISH_PATH)
 
 # Vérification au démarrage
 if not os.path.exists(STOCKFISH_PATH):
     print(f"ATTENTION: Stockfish non trouvé à {STOCKFISH_PATH}", file=sys.stderr)
+elif not os.access(STOCKFISH_PATH, os.X_OK):
+    print(f"ATTENTION: Stockfish n'est pas exécutable à {STOCKFISH_PATH}", file=sys.stderr)
+    # Tenter de le rendre exécutable
+    try:
+        os.chmod(STOCKFISH_PATH, 0o755)
+        print(f"✅ Permissions corrigées pour {STOCKFISH_PATH}", file=sys.stderr)
+    except Exception as e:
+        print(f"❌ Impossible de corriger les permissions: {e}", file=sys.stderr)
 else:
-    print(f"INFO: Stockfish trouvé à {STOCKFISH_PATH}", file=sys.stderr)
+    print(f"INFO: Stockfish trouvé et exécutable à {STOCKFISH_PATH}", file=sys.stderr)
 
 # --- FIN DE LA CORRECTION CRITIQUE ---
 
