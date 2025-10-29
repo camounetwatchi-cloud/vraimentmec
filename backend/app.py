@@ -72,11 +72,11 @@ CORS(app,
 # Initialiser la base de données
 init_db(app)
 
-# --- MODIFICATION ---
-# Initialiser SocketIO avec la MÊME liste d'origines
+# --- MODIFICATION (RETOUR À GEVENT) ---
+# Initialiser SocketIO avec la MÊME liste d'origines et gevent pour la production
 socketio = SocketIO(app,
                     cors_allowed_origins=allowed_origins, # Utiliser la même liste
-                    async_mode='threading', # Changé de 'gevent' à 'threading' pour compatibilité
+                    async_mode='gevent', # NÉCESSAIRE POUR LA PRODUCTION AVEC GUNICORN
                     logger=True,
                     engineio_logger=True)
 
@@ -311,7 +311,7 @@ def handle_resign(data):
         
     except Exception as e:
         print(f"❌ Erreur dans resign: {e}")
-        emit('error', {'message': 'Erreur lors de l\'abandon'})
+        emit('error', {'message': 'Erreur lors de l'abandon'})
 
 @socketio.on('offer_draw')
 def handle_offer_draw(data):
@@ -363,7 +363,7 @@ def handle_accept_draw(data):
         
     except Exception as e:
         print(f"❌ Erreur dans accept_draw: {e}")
-        emit('error', {'message': 'Erreur lors de l\'acceptation de la nulle'})
+        emit('error', {'message': 'Erreur lors de l'acceptation de la nulle'})
 
 # ========================================
 # GESTION D'ERREURS
@@ -383,13 +383,17 @@ def internal_error(error):
 # ========================================
 
 if __name__ == '__main__':
+    # Cette partie n'est utilisée que lorsque vous exécutez
+    # "python backend/app.py" localement.
+    # Gunicorn n'exécute pas ce bloc.
     port = int(os.environ.get('PORT', 5000))
-    print(f"🚀 Démarrage du serveur sur le port {port}...")
+    print(f"🚀 Démarrage du serveur de DÉVELOPPEMENT sur le port {port}...")
     
-    # En développement
+    # Utiliser gevent localement pour simuler la production
     socketio.run(app, 
                  host='0.0.0.0', 
                  port=port, 
                  debug=True,
                  use_reloader=True,
                  allow_unsafe_werkzeug=True)
+
