@@ -8,3 +8,4 @@ Flask-SocketIO==5.3.5
 python-socketio==5.10.0
 eventlet==0.33.3
 Werkzeug==3.0.1
+gevent
