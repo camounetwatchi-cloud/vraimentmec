@@ -2,7 +2,8 @@ from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
-from datetime import timedelta
+from datetime import timedelta, datetime
+import chess
 
 # Importer les modules du backend
 from backend.db_models import db, init_db, create_tables
@@ -18,11 +19,8 @@ app = Flask(__name__)
 # ========================================
 
 # Configuration de la base de données
-# Pour PostgreSQL (production), utilisez une variable d'environnement
-# Pour SQLite (développement local), utilisez le chemin ci-dessous
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-    # Heroku utilise postgres://, mais SQLAlchemy nécessite postgresql://
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL or 'sqlite:///chess_app.db'
@@ -30,21 +28,27 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configuration de la session
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'votre-cle-secrete-super-securisee-changez-moi')
-app.config['SESSION_COOKIE_SECURE'] = False  # Mettre True en production avec HTTPS
+app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Changé pour permettre cross-origin
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # ========================================
-# CONFIGURATION CORS (SOLUTION AU PROBLÈME)
+# CONFIGURATION CORS (CORRIGÉE)
 # ========================================
 
-# Configuration CORS pour permettre les requêtes depuis le frontend
+# Configuration CORS pour permettre les requêtes cross-origin
 CORS(app, 
-     resources={r"/api/*": {"origins": "*"}},  # En production, remplacer "*" par l'URL de votre frontend
-     supports_credentials=True,
-     allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+     resources={
+         r"/api/*": {
+             "origins": ["http://localhost:5000", "http://127.0.0.1:5000", "*"],
+             "supports_credentials": True,
+             "allow_headers": ["Content-Type", "Authorization"],
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "expose_headers": ["Content-Type"]
+         }
+     },
+     supports_credentials=True)
 
 # ========================================
 # INITIALISATION
@@ -55,20 +59,20 @@ init_db(app)
 
 # Initialiser SocketIO avec gevent pour les WebSockets
 socketio = SocketIO(app, 
-                    cors_allowed_origins="*",  # En production, spécifier l'origine exacte
-                    async_mode='gevent',
+                    cors_allowed_origins="*",
+                    async_mode='threading',  # Changé de 'gevent' à 'threading' pour compatibilité
                     logger=True,
                     engineio_logger=True)
 
 # Créer les tables au démarrage
 with app.app_context():
     create_tables(app)
+    print("✅ Tables créées avec succès!")
 
 # ========================================
 # ENREGISTREMENT DES BLUEPRINTS
 # ========================================
 
-# Enregistrer le blueprint d'authentification
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 # ========================================
@@ -81,6 +85,7 @@ def home():
     return jsonify({
         'message': 'Bienvenue sur l\'API Chess Generator',
         'version': '1.0.0',
+        'status': 'running',
         'endpoints': {
             'auth': '/api/auth/*',
             'generate': '/api/generate',
@@ -91,25 +96,26 @@ def home():
 @app.route('/api/health')
 def health_check():
     """Endpoint de santé pour vérifier que l'API fonctionne"""
-    return jsonify({
-        'status': 'healthy',
-        'database': 'connected' if db.engine else 'disconnected',
-        'active_games': MatchmakingManager.get_active_games_count(),
-        'waiting_players': MatchmakingManager.get_waiting_players_count()
-    })
+    try:
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'active_games': MatchmakingManager.get_active_games_count(),
+            'waiting_players': MatchmakingManager.get_waiting_players_count(),
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
-@app.route('/api/generate', methods=['POST'])
+@app.route('/api/generate', methods=['POST', 'OPTIONS'])
 def generate_position():
-    """
-    Endpoint pour générer une position FEN d'échecs.
-    
-    Body JSON attendu:
-    {
-        "target_min": int (centipawns),
-        "target_max": int (centipawns),
-        "max_attempts": int
-    }
-    """
+    """Endpoint pour générer une position FEN d'échecs"""
+    if request.method == 'OPTIONS':
+        return '', 204
+        
     try:
         data = request.get_json()
         
@@ -139,7 +145,7 @@ def generate_position():
         })
         
     except Exception as e:
-        print(f"Erreur lors de la génération: {e}")
+        print(f"❌ Erreur lors de la génération: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -152,18 +158,16 @@ def generate_position():
 @socketio.on('connect')
 def handle_connect():
     """Gère la connexion d'un client WebSocket"""
-    print(f"Client connecté: {request.sid}")
+    print(f"✅ Client connecté: {request.sid}")
     emit('connection_established', {'sid': request.sid})
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """Gère la déconnexion d'un client WebSocket"""
-    print(f"Client déconnecté: {request.sid}")
+    print(f"❌ Client déconnecté: {request.sid}")
     
-    # Retirer le joueur de la file d'attente
     MatchmakingManager.remove_player(request.sid)
     
-    # Si le joueur était dans une partie, gérer l'abandon
     game_id = MatchmakingManager.find_game_by_player_id(request.sid)
     if game_id:
         game = games.get(game_id)
@@ -178,16 +182,7 @@ def handle_disconnect():
 
 @socketio.on('join_queue')
 def handle_join_queue(data):
-    """
-    Gère l'ajout d'un joueur à la file d'attente.
-    
-    Data attendu:
-    {
-        "user_id": str,
-        "username": str,
-        "elo": int
-    }
-    """
+    """Gère l'ajout d'un joueur à la file d'attente"""
     try:
         user_id = data.get('user_id')
         username = data.get('username', 'Joueur')
@@ -197,22 +192,18 @@ def handle_join_queue(data):
             emit('error', {'message': 'user_id requis'})
             return
         
-        # Ajouter le joueur à la file d'attente
         MatchmakingManager.add_player(request.sid, user_id, username, elo)
         
-        # Notifier le joueur qu'il est en file d'attente
         emit('queue_joined', {
             'message': 'Vous êtes dans la file d\'attente',
             'waiting_players': MatchmakingManager.get_waiting_players_count()
         })
         
-        # Essayer de trouver un match
         game_id = MatchmakingManager.check_for_match(request.sid)
         
         if game_id:
             game = games[game_id]
             
-            # Notifier les deux joueurs que la partie commence
             for player_sid in game.players.keys():
                 player_color = game.get_player_color(player_sid)
                 opponent_sid = game.get_opponent_id(player_sid)
@@ -230,7 +221,7 @@ def handle_join_queue(data):
                 }, room=player_sid)
         
     except Exception as e:
-        print(f"Erreur dans join_queue: {e}")
+        print(f"❌ Erreur dans join_queue: {e}")
         emit('error', {'message': 'Erreur lors de l\'ajout à la file d\'attente'})
 
 @socketio.on('leave_queue')
@@ -241,15 +232,7 @@ def handle_leave_queue():
 
 @socketio.on('make_move')
 def handle_make_move(data):
-    """
-    Gère un mouvement d'échecs.
-    
-    Data attendu:
-    {
-        "game_id": str,
-        "move": str (format UCI, ex: "e2e4")
-    }
-    """
+    """Gère un mouvement d'échecs"""
     try:
         game_id = data.get('game_id')
         move = data.get('move')
@@ -263,11 +246,9 @@ def handle_make_move(data):
             emit('error', {'message': 'Partie introuvable'})
             return
         
-        # Effectuer le mouvement
         try:
             new_fen, status, info = game.make_move(request.sid, move)
             
-            # Notifier les deux joueurs du mouvement
             emit('move_made', {
                 'fen': new_fen,
                 'move': move,
@@ -275,16 +256,14 @@ def handle_make_move(data):
                 'info': info
             }, room=game_id)
             
-            # Si la partie est terminée, la supprimer
             if info.get('result'):
                 MatchmakingManager.remove_game(game_id)
             
         except ValueError as e:
-            # Mouvement illégal
             emit('invalid_move', {'message': str(e)})
     
     except Exception as e:
-        print(f"Erreur dans make_move: {e}")
+        print(f"❌ Erreur dans make_move: {e}")
         emit('error', {'message': 'Erreur lors du mouvement'})
 
 @socketio.on('resign')
@@ -302,24 +281,20 @@ def handle_resign(data):
             emit('error', {'message': 'Partie introuvable'})
             return
         
-        # Déterminer le résultat
         player_color = game.get_player_color_enum(request.sid)
         result = 'black_win' if player_color == chess.WHITE else 'white_win'
         
-        # Sauvegarder la partie
         game.save_to_database(result)
         
-        # Notifier les joueurs
         emit('game_over', {
             'result': result,
             'reason': 'resignation'
         }, room=game_id)
         
-        # Supprimer la partie
         MatchmakingManager.remove_game(game_id)
         
     except Exception as e:
-        print(f"Erreur dans resign: {e}")
+        print(f"❌ Erreur dans resign: {e}")
         emit('error', {'message': 'Erreur lors de l\'abandon'})
 
 @socketio.on('offer_draw')
@@ -337,14 +312,13 @@ def handle_offer_draw(data):
             emit('error', {'message': 'Partie introuvable'})
             return
         
-        # Notifier l'adversaire
         opponent_sid = game.get_opponent_id(request.sid)
         emit('draw_offered', {
             'message': 'Votre adversaire propose une nulle'
         }, room=opponent_sid)
         
     except Exception as e:
-        print(f"Erreur dans offer_draw: {e}")
+        print(f"❌ Erreur dans offer_draw: {e}")
         emit('error', {'message': 'Erreur lors de la proposition de nulle'})
 
 @socketio.on('accept_draw')
@@ -362,31 +336,44 @@ def handle_accept_draw(data):
             emit('error', {'message': 'Partie introuvable'})
             return
         
-        # Sauvegarder la partie comme nulle
         game.save_to_database('draw')
         
-        # Notifier les joueurs
         emit('game_over', {
             'result': 'draw',
             'reason': 'agreement'
         }, room=game_id)
         
-        # Supprimer la partie
         MatchmakingManager.remove_game(game_id)
         
     except Exception as e:
-        print(f"Erreur dans accept_draw: {e}")
+        print(f"❌ Erreur dans accept_draw: {e}")
         emit('error', {'message': 'Erreur lors de l\'acceptation de la nulle'})
+
+# ========================================
+# GESTION D'ERREURS
+# ========================================
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint non trouvé'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    print(f"❌ Erreur serveur: {error}")
+    return jsonify({'error': 'Erreur interne du serveur'}), 500
 
 # ========================================
 # DÉMARRAGE DE L'APPLICATION
 # ========================================
 
 if __name__ == '__main__':
-    # Démarrer le serveur en mode développement
-    # En production, utilisez Gunicorn avec gevent workers
+    port = int(os.environ.get('PORT', 5000))
+    print(f"🚀 Démarrage du serveur sur le port {port}...")
+    
+    # En développement
     socketio.run(app, 
                  host='0.0.0.0', 
-                 port=5000, 
+                 port=port, 
                  debug=True,
-                 use_reloader=True)
+                 use_reloader=True,
+                 allow_unsafe_werkzeug=True)
