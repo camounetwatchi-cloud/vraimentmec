@@ -67,13 +67,16 @@ CORS(app,
 init_db(app)
 
 # Initialiser SocketIO avec gevent (compatible Python 3.13)
-socketio = SocketIO(app,
-                    cors_allowed_origins=allowed_origins,
-                    async_mode='gevent',
-                    logger=True,
-                    engineio_logger=True,
-                    ping_timeout=60,
-                    ping_interval=25)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=allowed_origins,
+    async_mode='gevent',  # IMPORTANT
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25,
+    manage_session=False  # Important pour gevent
+)
 
 # Créer les tables au démarrage
 try:
