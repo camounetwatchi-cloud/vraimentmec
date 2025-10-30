@@ -66,14 +66,16 @@ CORS(app,
 # Initialiser la base de données
 init_db(app)
 
-# Initialiser SocketIO
+# Initialiser SocketIO avec gevent (compatible Python 3.13)
 socketio = SocketIO(app,
                     cors_allowed_origins=allowed_origins,
-                    async_mode='eventlet',
+                    async_mode='gevent',
                     logger=True,
-                    engineio_logger=True)
+                    engineio_logger=True,
+                    ping_timeout=60,
+                    ping_interval=25)
 
-# Créer les tables au démarrage - CORRECTION ICI
+# Créer les tables au démarrage
 try:
     with app.app_context():
         create_tables(app)
@@ -98,6 +100,8 @@ def home():
         'message': 'Bienvenue sur l\'API Chess Generator',
         'version': '1.0.0',
         'status': 'running',
+        'python_version': '3.13',
+        'async_mode': 'gevent',
         'endpoints': {
             'auth': '/api/auth/*',
             'generate': '/api/generate',
@@ -114,6 +118,7 @@ def health_check():
             'database': 'connected',
             'active_games': MatchmakingManager.get_active_games_count(),
             'waiting_players': MatchmakingManager.get_waiting_players_count(),
+            'async_mode': socketio.async_mode,
             'timestamp': datetime.utcnow().isoformat()
         })
     except Exception as e:
@@ -171,7 +176,7 @@ def generate_position():
 def handle_connect():
     """Gère la connexion d'un client WebSocket"""
     print(f"✅ Client connecté: {request.sid}")
-    emit('connection_established', {'sid': request.sid})
+    emit('connection_established', {'sid': request.sid, 'async_mode': 'gevent'})
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -307,7 +312,7 @@ def handle_resign(data):
         
     except Exception as e:
         print(f"❌ Erreur dans resign: {e}")
-        emit('error', {'message': "Erreur lors de l abandon"})
+        emit('error', {'message': "Erreur lors de l'abandon"})
 
 @socketio.on('offer_draw')
 def handle_offer_draw(data):
@@ -359,7 +364,7 @@ def handle_accept_draw(data):
         
     except Exception as e:
         print(f"❌ Erreur dans accept_draw: {e}")
-        emit('error', {'message': 'Erreur lors de l'acceptation de la nulle'})
+        emit('error', {'message': 'Erreur lors de l\'acceptation de la nulle'})
 
 # ========================================
 # GESTION D'ERREURS
@@ -381,6 +386,7 @@ def internal_error(error):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 Démarrage du serveur sur le port {port}...")
+    print(f"🐍 Python 3.13 avec gevent")
     
     socketio.run(app, 
                  host='0.0.0.0', 
