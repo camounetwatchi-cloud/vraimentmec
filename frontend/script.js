@@ -1,6 +1,10 @@
-// Configuration - À MODIFIER selon votre déploiement
-const API_URL = 'http://localhost:5000/api'; // En local
-// const API_URL = 'https://votre-backend.herokuapp.com/api'; // En production
+// Configuration de l'API - CORRIGÉE
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
+    : 'http://chessishard-env-env.eba-f8bxehfn.eu-west-1.elasticbeanstalk.com/api';
+
+// Afficher l'URL utilisée pour le debug
+console.log('🔧 API URL configurée:', API_URL);
 
 const generateBtn = document.getElementById('generateBtn');
 const btnText = document.getElementById('btnText');
