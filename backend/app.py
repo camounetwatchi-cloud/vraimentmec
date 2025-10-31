@@ -41,11 +41,15 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 # CONFIGURATION CORS
 # ========================================
 
+# ========================================
+# CONFIGURATION CORS
+# ========================================
+
 allowed_origins = [
     "null",
     "http://localhost:5000",
     "http://127.0.0.1:5000",
-    "http://chessishard-env.eba-msuf2pqs.eu-west-1.elasticbeanstalk.com"
+    "http://chessishard-env-env.eba-f8bxehfn.eu-west-1.elasticbeanstalk.com"
 ]
 
 CORS(app,
