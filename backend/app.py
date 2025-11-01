@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
@@ -32,32 +32,25 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 # Configuration de la session
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'votre-cle-secrete-super-securisee-changez-moi')
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_SECURE'] = False  # True en production HTTPS uniquement
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None' if os.environ.get('FLASK_ENV') == 'production' else 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # ========================================
-# CONFIGURATION CORS
+# CONFIGURATION CORS - SIMPLIFIÉE ET FONCTIONNELLE
 # ========================================
 
-allowed_origins = [
-    "null",
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-    "http://chessishard-env-env.eba-f8bxehfn.eu-west-1.elasticbeanstalk.com"
-]
+is_production = os.environ.get('FLASK_ENV') == 'production'
 
-CORS(app,
-     resources={
-         r"/api/*": {
-             "origins": allowed_origins,
-             "supports_credentials": True,
-             "allow_headers": ["Content-Type", "Authorization"],
-             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-             "expose_headers": ["Content-Type"]
-         }
-     })
+print(f"🔧 Mode: {'Production' if is_production else 'Développement'}")
+
+# Configuration CORS simple et permissive pour le développement
+CORS(app, 
+     resources={r"/*": {"origins": "*"}},
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # ========================================
 # INITIALISATION
@@ -67,9 +60,6 @@ CORS(app,
 init_db(app)
 
 # Déterminer le mode async approprié
-# En production sur AWS avec gevent installé, utiliser gevent
-# En développement Windows, utiliser threading
-is_production = os.environ.get('FLASK_ENV') == 'production'
 async_mode = 'gevent' if is_production else 'threading'
 
 print(f"🔧 Mode async: {async_mode}")
@@ -77,10 +67,10 @@ print(f"🔧 Mode async: {async_mode}")
 # Initialiser SocketIO
 socketio = SocketIO(
     app,
-    cors_allowed_origins=allowed_origins,
+    cors_allowed_origins="*",
     async_mode=async_mode,
     logger=True,
-    engineio_logger=True,
+    engineio_logger=False,
     ping_timeout=60,
     ping_interval=25,
     manage_session=False
@@ -93,6 +83,38 @@ try:
         print("✅ Tables créées avec succès!")
 except Exception as e:
     print(f"⚠️ Avertissement lors de la création des tables: {e}")
+
+# ========================================
+# ROUTES POUR SERVIR LES FICHIERS FRONTEND
+# ========================================
+
+@app.route('/auth')
+@app.route('/auth.html')
+def serve_auth():
+    """Sert la page d'authentification"""
+    return send_from_directory('../frontend', 'auth.html')
+
+@app.route('/game')
+@app.route('/game.html')
+def serve_game():
+    """Sert la page de jeu"""
+    return send_from_directory('../frontend', 'game.html')
+
+@app.route('/index.html')
+@app.route('/home')
+def serve_index():
+    """Sert la page d'accueil"""
+    return send_from_directory('../frontend', 'index.html')
+
+@app.route('/style.css')
+def serve_css():
+    """Sert le CSS"""
+    return send_from_directory('../frontend', 'style.css')
+
+@app.route('/script.js')
+def serve_js():
+    """Sert le JavaScript"""
+    return send_from_directory('../frontend', 'script.js')
 
 # ========================================
 # ENREGISTREMENT DES BLUEPRINTS
@@ -111,11 +133,17 @@ def home():
         'message': 'Bienvenue sur l\'API Chess Generator',
         'version': '1.0.0',
         'status': 'running',
+        'mode': 'production' if is_production else 'development',
         'async_mode': socketio.async_mode,
         'endpoints': {
             'auth': '/api/auth/*',
             'generate': '/api/generate',
-            'health': '/api/health'
+            'health': '/api/health',
+            'frontend': {
+                'auth': '/auth',
+                'game': '/game',
+                'home': '/home'
+            }
         }
     })
 
@@ -396,7 +424,8 @@ def internal_error(error):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 Démarrage du serveur sur le port {port}...")
-    print(f"🔧 Mode async: {socketio.async_mode}")
+    print(f"🌐 Accès frontend: http://localhost:{port}/auth")
+    print(f"🌐 API: http://localhost:{port}/api/health")
     
     socketio.run(app, 
                  host='0.0.0.0', 
