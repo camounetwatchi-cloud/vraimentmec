@@ -34,12 +34,8 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'votre-cle-secrete-super-securisee-changez-moi')
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None' if os.environ.get('FLASK_ENV') == 'production' else 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
-
-# ========================================
-# CONFIGURATION CORS
-# ========================================
 
 # ========================================
 # CONFIGURATION CORS
@@ -70,16 +66,24 @@ CORS(app,
 # Initialiser la base de données
 init_db(app)
 
-# Initialiser SocketIO avec gevent (compatible Python 3.13)
+# Déterminer le mode async approprié
+# En production sur AWS avec gevent installé, utiliser gevent
+# En développement Windows, utiliser threading
+is_production = os.environ.get('FLASK_ENV') == 'production'
+async_mode = 'gevent' if is_production else 'threading'
+
+print(f"🔧 Mode async: {async_mode}")
+
+# Initialiser SocketIO
 socketio = SocketIO(
     app,
     cors_allowed_origins=allowed_origins,
-    async_mode='gevent',  # IMPORTANT
+    async_mode=async_mode,
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
     ping_interval=25,
-    manage_session=False  # Important pour gevent
+    manage_session=False
 )
 
 # Créer les tables au démarrage
@@ -107,8 +111,7 @@ def home():
         'message': 'Bienvenue sur l\'API Chess Generator',
         'version': '1.0.0',
         'status': 'running',
-        'python_version': '3.13',
-        'async_mode': 'gevent',
+        'async_mode': socketio.async_mode,
         'endpoints': {
             'auth': '/api/auth/*',
             'generate': '/api/generate',
@@ -183,7 +186,7 @@ def generate_position():
 def handle_connect():
     """Gère la connexion d'un client WebSocket"""
     print(f"✅ Client connecté: {request.sid}")
-    emit('connection_established', {'sid': request.sid, 'async_mode': 'gevent'})
+    emit('connection_established', {'sid': request.sid, 'async_mode': socketio.async_mode})
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -393,7 +396,7 @@ def internal_error(error):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 Démarrage du serveur sur le port {port}...")
-    print(f"🐍 Python 3.13 avec gevent")
+    print(f"🔧 Mode async: {socketio.async_mode}")
     
     socketio.run(app, 
                  host='0.0.0.0', 
