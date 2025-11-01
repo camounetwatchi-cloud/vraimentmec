@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from .db_models import db, User
 import re
 from datetime import datetime
+import uuid
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -12,6 +13,63 @@ def is_valid_email(email):
 def is_valid_username(username):
     """Valide le format d'un username (alphanumérique et underscores)."""
     return re.match(r'^[a-zA-Z0-9_]{3,20}$', username)
+
+@auth_bp.route('/guest', methods=['POST', 'OPTIONS'])
+def guest_login():
+    """
+    Endpoint pour se connecter en tant qu'invité.
+    Crée un utilisateur temporaire avec un nom aléatoire.
+    """
+    # Gérer les requêtes OPTIONS pour CORS
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        # Générer un nom d'invité unique
+        guest_username = f"Guest_{uuid.uuid4().hex[:8]}"
+        guest_email = f"{guest_username.lower()}@guest.local"
+        guest_password = uuid.uuid4().hex
+        
+        # Créer l'utilisateur invité
+        user = User(username=guest_username, email=guest_email)
+        user.set_password(guest_password)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # Créer la session
+        session['user_id'] = user.id
+        session['username'] = user.username
+        session['elo'] = user.elo_rating
+        session['is_guest'] = True
+        session.permanent = True
+        
+        print(f"✅ Invité créé: {guest_username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Connexion en tant qu\'invité réussie',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'elo': user.elo_rating,
+                'games_played': user.games_played,
+                'games_won': user.games_won,
+                'is_guest': True
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erreur lors de la création de l'invité: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False, 
+            'error': 'Erreur serveur lors de la création de l\'invité'
+        }), 500
+
 
 @auth_bp.route('/register', methods=['POST', 'OPTIONS'])
 def register():
@@ -87,6 +145,7 @@ def register():
         session['user_id'] = user.id
         session['username'] = user.username
         session['elo'] = user.elo_rating
+        session['is_guest'] = False
         session.permanent = True
         
         print(f"✅ Nouvel utilisateur créé: {username}")
@@ -100,7 +159,8 @@ def register():
                 'email': user.email,
                 'elo': user.elo_rating,
                 'games_played': user.games_played,
-                'games_won': user.games_won
+                'games_won': user.games_won,
+                'is_guest': False
             }
         }), 201
         
@@ -163,6 +223,7 @@ def login():
         session['user_id'] = user.id
         session['username'] = user.username
         session['elo'] = user.elo_rating
+        session['is_guest'] = False
         session.permanent = True
         
         print(f"✅ Connexion réussie: {user.username}")
@@ -178,6 +239,7 @@ def login():
                 'games_played': user.games_played,
                 'games_won': user.games_won,
                 'is_online': user.is_online,
+                'is_guest': False,
                 'created_at': user.created_at.isoformat() if user.created_at else None,
                 'last_login': user.last_login.isoformat() if user.last_login else None
             }
@@ -203,13 +265,21 @@ def logout():
     
     try:
         user_id = session.get('user_id')
+        is_guest = session.get('is_guest', False)
         
         if user_id:
             user = User.query.get(user_id)
             if user:
                 user.is_online = False
+                
+                # Supprimer les comptes invités après déconnexion
+                if is_guest:
+                    db.session.delete(user)
+                    print(f"✅ Compte invité supprimé: {user.username}")
+                else:
+                    print(f"✅ Déconnexion: {user.username}")
+                
                 db.session.commit()
-                print(f"✅ Déconnexion: {user.username}")
         
         # Nettoyer la session
         session.clear()
@@ -253,6 +323,8 @@ def get_current_user():
                 'error': 'Utilisateur introuvable'
             }), 404
         
+        is_guest = session.get('is_guest', False)
+        
         return jsonify({
             'success': True,
             'user': {
@@ -263,6 +335,7 @@ def get_current_user():
                 'games_played': user.games_played,
                 'games_won': user.games_won,
                 'is_online': user.is_online,
+                'is_guest': is_guest,
                 'created_at': user.created_at.isoformat() if user.created_at else None,
                 'last_login': user.last_login.isoformat() if user.last_login else None
             }
@@ -286,7 +359,8 @@ def check_auth():
     user_id = session.get('user_id')
     return jsonify({
         'authenticated': user_id is not None,
-        'user_id': user_id
+        'user_id': user_id,
+        'is_guest': session.get('is_guest', False)
     }), 200
 
 
@@ -325,6 +399,7 @@ def get_user_stats():
                 'games_won': user.games_won,
                 'games_lost': user.games_played - user.games_won,
                 'win_rate': round(win_rate, 2),
+                'is_guest': session.get('is_guest', False),
                 'member_since': user.created_at.isoformat() if user.created_at else None
             }
         }), 200
@@ -346,12 +421,19 @@ def update_profile():
     
     try:
         user_id = session.get('user_id')
+        is_guest = session.get('is_guest', False)
         
         if not user_id:
             return jsonify({
                 'success': False, 
                 'error': 'Non authentifié'
             }), 401
+        
+        if is_guest:
+            return jsonify({
+                'success': False, 
+                'error': 'Les invités ne peuvent pas modifier leur profil'
+            }), 403
         
         user = User.query.get(user_id)
         
@@ -411,12 +493,19 @@ def change_password():
     
     try:
         user_id = session.get('user_id')
+        is_guest = session.get('is_guest', False)
         
         if not user_id:
             return jsonify({
                 'success': False, 
                 'error': 'Non authentifié'
             }), 401
+        
+        if is_guest:
+            return jsonify({
+                'success': False, 
+                'error': 'Les invités ne peuvent pas changer leur mot de passe'
+            }), 403
         
         user = User.query.get(user_id)
         
