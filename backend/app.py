@@ -663,9 +663,11 @@ def create_challenge():
         }), 500
 
 
+# Dans backend/app.py, remplacez la fonction accept_challenge par celle-ci :
+
 @app.route('/api/challenges/<challenge_id>/accept', methods=['POST'])
 def accept_challenge(challenge_id):
-    """Accepte un défi et crée une partie"""
+    """Accepte un défi et notifie les joueurs"""
     try:
         user_id = session.get('user_id')
         
@@ -691,8 +693,6 @@ def accept_challenge(challenge_id):
             }), 400
         
         from backend.db_models import User
-        from backend.socket_manager import Game, games
-        import random
         
         user = User.query.get(user_id)
         challenger = User.query.get(challenge['challenger_id'])
@@ -703,33 +703,37 @@ def accept_challenge(challenge_id):
                 'error': 'Utilisateur introuvable'
             }), 404
         
-        # Créer la partie avec la FEN du défi
-        game = Game(
-            'challenge_' + user_id,  # SID temporaire pour l'accepteur
-            'challenge_' + challenge['challenger_id'],  # SID temporaire pour le challenger
-            user_id,
-            challenge['challenger_id'],
-            challenge['fen']
-        )
+        # Générer un game_id unique
+        import uuid
+        game_id = str(uuid.uuid4())
         
-        games[game.game_id] = game
+        # Stocker les informations du défi accepté pour que les clients WebSocket puissent les récupérer
+        # On ne crée PAS la partie ici car on n'a pas les vrais SID WebSocket
+        # La partie sera créée via WebSocket quand les deux joueurs se connecteront
         
-        print(f"✅ Partie créée depuis le défi: {game.game_id}")
+        print(f"✅ Défi accepté: {challenge_id}")
+        print(f"   Challenger: {challenger.username}")
+        print(f"   Accepteur: {user.username}")
+        print(f"   FEN: {challenge['fen']}")
         
-        # Supprimer le défi
+        # Supprimer le défi de la liste
         del challenges[challenge_id]
         
         # Notifier les deux joueurs via WebSocket
         socketio.emit('challenge_accepted', {
-            'game_id': game.game_id,
+            'challenge_id': challenge_id,
+            'game_id': game_id,
             'challenger_id': challenge['challenger_id'],
             'accepter_id': user_id,
+            'challenger_name': challenger.username,
+            'accepter_name': user.username,
             'fen': challenge['fen']
         }, broadcast=True)
         
         return jsonify({
             'success': True,
-            'game_id': game.game_id,
+            'game_id': game_id,
+            'challenge_id': challenge_id,
             'message': 'Défi accepté ! La partie va commencer...'
         })
         
