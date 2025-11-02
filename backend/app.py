@@ -423,6 +423,8 @@ def internal_error(error):
 
 # Ajoutez ces endpoints dans backend/app.py après les routes existantes
 
+# Ajoutez ces endpoints dans backend/app.py après les routes existantes
+
 @app.route('/api/players/online', methods=['GET'])
 def get_online_players():
     """Récupère la liste des joueurs connectés"""
@@ -458,6 +460,100 @@ def get_online_players():
         
     except Exception as e:
         print(f"❌ Erreur get_online_players: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Erreur serveur'
+        }), 500
+
+
+@app.route('/api/players/set-online', methods=['POST'])
+def set_player_online():
+    """Marque le joueur comme en ligne"""
+    try:
+        user_id = session.get('user_id')
+        
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'Non authentifié'
+            }), 401
+        
+        from backend.db_models import User
+        from datetime import datetime
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'success': False,
+                'error': 'Utilisateur introuvable'
+            }), 404
+        
+        # Mettre à jour le statut
+        user.is_online = True
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        print(f"✅ {user.username} est maintenant en ligne")
+        
+        # Notifier les autres joueurs via WebSocket
+        socketio.emit('player_online', {
+            'user_id': user.id,
+            'username': user.username,
+            'elo': user.elo_rating
+        }, broadcast=True)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Statut mis à jour'
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur set_player_online: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Erreur serveur'
+        }), 500
+
+
+@app.route('/api/players/set-offline', methods=['POST'])
+def set_player_offline():
+    """Marque le joueur comme hors ligne"""
+    try:
+        user_id = session.get('user_id')
+        
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'Non authentifié'
+            }), 401
+        
+        from backend.db_models import User
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'success': False,
+                'error': 'Utilisateur introuvable'
+            }), 404
+        
+        user.is_online = False
+        db.session.commit()
+        
+        print(f"✅ {user.username} est maintenant hors ligne")
+        
+        # Notifier les autres joueurs via WebSocket
+        socketio.emit('player_offline', {
+            'user_id': user.id,
+            'username': user.username
+        }, broadcast=True)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Statut mis à jour'
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur set_player_offline: {e}")
         return jsonify({
             'success': False,
             'error': 'Erreur serveur'
@@ -546,6 +642,13 @@ def create_challenge():
         
         print(f"✅ Défi créé: {challenge_id} par {user.username}")
         
+        # Notifier tous les joueurs via WebSocket
+        socketio.emit('new_challenge', {
+            'challenge_id': challenge_id,
+            'challenger_name': user.username,
+            'challenger_elo': user.elo_rating
+        }, broadcast=True)
+        
         return jsonify({
             'success': True,
             'challenge_id': challenge_id,
@@ -562,7 +665,7 @@ def create_challenge():
 
 @app.route('/api/challenges/<challenge_id>/accept', methods=['POST'])
 def accept_challenge(challenge_id):
-    """Accepte un défi"""
+    """Accepte un défi et crée une partie"""
     try:
         user_id = session.get('user_id')
         
@@ -588,6 +691,8 @@ def accept_challenge(challenge_id):
             }), 400
         
         from backend.db_models import User
+        from backend.socket_manager import Game, games
+        import random
         
         user = User.query.get(user_id)
         challenger = User.query.get(challenge['challenger_id'])
@@ -598,20 +703,40 @@ def accept_challenge(challenge_id):
                 'error': 'Utilisateur introuvable'
             }), 404
         
-        # Pour l'instant, on retourne juste un succès
-        # Plus tard, on créera la partie via WebSocket
-        print(f"✅ Défi accepté: {challenge_id} par {user.username}")
+        # Créer la partie avec la FEN du défi
+        game = Game(
+            'challenge_' + user_id,  # SID temporaire pour l'accepteur
+            'challenge_' + challenge['challenger_id'],  # SID temporaire pour le challenger
+            user_id,
+            challenge['challenger_id'],
+            challenge['fen']
+        )
+        
+        games[game.game_id] = game
+        
+        print(f"✅ Partie créée depuis le défi: {game.game_id}")
         
         # Supprimer le défi
         del challenges[challenge_id]
         
+        # Notifier les deux joueurs via WebSocket
+        socketio.emit('challenge_accepted', {
+            'game_id': game.game_id,
+            'challenger_id': challenge['challenger_id'],
+            'accepter_id': user_id,
+            'fen': challenge['fen']
+        }, broadcast=True)
+        
         return jsonify({
             'success': True,
+            'game_id': game.game_id,
             'message': 'Défi accepté ! La partie va commencer...'
         })
         
     except Exception as e:
         print(f"❌ Erreur accept_challenge: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': 'Erreur serveur'
@@ -650,6 +775,11 @@ def cancel_challenge(challenge_id):
         
         print(f"✅ Défi annulé: {challenge_id}")
         
+        # Notifier tous les joueurs
+        socketio.emit('challenge_cancelled', {
+            'challenge_id': challenge_id
+        }, broadcast=True)
+        
         return jsonify({
             'success': True,
             'message': 'Défi annulé avec succès'
@@ -661,17 +791,3 @@ def cancel_challenge(challenge_id):
             'success': False,
             'error': 'Erreur serveur'
         }), 500
-
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    print(f"🚀 Démarrage du serveur sur le port {port}...")
-    print(f"🌐 Accès frontend: http://localhost:{port}/auth")
-    print(f"🌐 API: http://localhost:{port}/api/health")
-    
-    socketio.run(app, 
-                 host='0.0.0.0', 
-                 port=port, 
-                 debug=True,
-                 use_reloader=True,
-                 allow_unsafe_werkzeug=True)
