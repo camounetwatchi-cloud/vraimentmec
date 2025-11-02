@@ -152,6 +152,10 @@
             background-color: rgba(255, 255, 0, 0.4) !important;
         }
 
+        .square.check {
+            background-color: rgba(255, 0, 0, 0.5) !important;
+        }
+
         .piece {
             cursor: grab;
             user-select: none;
@@ -504,6 +508,26 @@
             border-radius: 4px;
         }
 
+        .mode-indicator {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: 600;
+            color: #1976d2;
+        }
+
+        .mode-indicator.analysis {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .mode-indicator.game {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
         @media (max-width: 1400px) {
             .game-container {
                 grid-template-columns: 1fr;
@@ -536,6 +560,11 @@
             <div class="side-panel">
                 <h2>Actions</h2>
                 
+                <!-- Mode indicator -->
+                <div id="modeIndicator" class="mode-indicator analysis">
+                    📊 Mode Analyse
+                </div>
+                
                 <div id="statusMessage" class="status-message waiting">
                     Choisissez une action pour commencer
                 </div>
@@ -550,6 +579,10 @@
 
                 <button id="createChallengeBtn" class="action-btn secondary">
                     ⚔️ Créer un défi
+                </button>
+
+                <button id="resetBoardBtn" class="action-btn secondary" onclick="resetToCurrentFen()">
+                    ↩️ Réinitialiser position
                 </button>
 
                 <div id="gameControls" class="game-controls" style="display: none;">
@@ -635,6 +668,8 @@
 
     <!-- Socket.IO -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Chess.js pour la validation des coups -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 
     <script>
         // Configuration de l'API
@@ -651,9 +686,13 @@
         let playerColor = null;
         let selectedSquare = null;
         let legalMoves = [];
-        let currentBoard = null;
         let moveHistory = [];
         let currentFen = '2b5/4pQ2/pkp2b1p/6p1/3p4/6n1/3KR1r1/8 w - - 0 24';
+        let savedFen = currentFen; // FEN de départ pour réinitialisation
+        let gameMode = 'analysis'; // 'analysis' ou 'game'
+
+        // Instance Chess.js pour la logique locale
+        let chessGame = new Chess(currentFen);
 
         // Unicode chess pieces
         const PIECES = {
@@ -668,23 +707,18 @@
             loadPosition(currentFen);
             connectWebSocket();
             
-            // Signaler qu'on est en ligne
             await setPlayerOnline();
             
-            // Attacher les événements aux boutons
             document.getElementById('reloadPositionBtn').addEventListener('click', reloadPosition);
             document.getElementById('createChallengeBtn').addEventListener('click', createChallenge);
             
-            // Charger les listes
             loadOnlinePlayers();
             loadChallenges();
             
-            // Rafraîchir périodiquement
             setInterval(loadOnlinePlayers, 5000);
             setInterval(loadChallenges, 3000);
         });
 
-        // Se déconnecter quand on quitte la page
         window.addEventListener('beforeunload', async () => {
             await setPlayerOffline();
         });
@@ -717,7 +751,6 @@
             }
         }
 
-        // Marquer le joueur comme en ligne
         async function setPlayerOnline() {
             try {
                 const response = await fetch(`${API_URL}/api/players/set-online`, {
@@ -729,15 +762,12 @@
                 
                 if (data.success) {
                     console.log('✅ Statut en ligne défini');
-                } else {
-                    console.warn('⚠️ Erreur statut en ligne:', data.error);
                 }
             } catch (error) {
                 console.error('❌ Erreur setPlayerOnline:', error);
             }
         }
 
-        // Marquer le joueur comme hors ligne
         async function setPlayerOffline() {
             try {
                 const response = await fetch(`${API_URL}/api/players/set-offline`, {
@@ -749,8 +779,6 @@
                 
                 if (data.success) {
                     console.log('✅ Statut hors ligne défini');
-                } else {
-                    console.warn('⚠️ Erreur statut hors ligne:', data.error);
                 }
             } catch (error) {
                 console.error('❌ Erreur setPlayerOffline:', error);
@@ -776,55 +804,91 @@
             console.log('✅ Échiquier initialisé');
         }
 
-        // Parser FEN
-        function parseFEN(fen) {
-            const board = Array(8).fill(null).map(() => Array(8).fill(null));
-            const rows = fen.split(' ')[0].split('/');
-            
-            for (let i = 0; i < 8; i++) {
-                let col = 0;
-                for (let char of rows[i]) {
-                    if (isNaN(char)) {
-                        board[i][col] = char;
-                        col++;
-                    } else {
-                        col += parseInt(char);
-                    }
-                }
-            }
-            
-            return board;
-        }
-
         // Charger une position FEN
         function loadPosition(fen) {
             console.log('📋 Chargement FEN:', fen);
-            currentBoard = parseFEN(fen);
             currentFen = fen;
-            document.getElementById('currentFen').textContent = fen;
-            renderBoard();
+            savedFen = fen;
+            
+            try {
+                chessGame = new Chess(fen);
+                document.getElementById('currentFen').textContent = fen;
+                renderBoard();
+                updateMoveHistory();
+                console.log('✅ Position chargée avec succès');
+            } catch (error) {
+                console.error('❌ FEN invalide:', error);
+                alert('Position FEN invalide');
+            }
         }
 
         // Rendre l'échiquier
         function renderBoard() {
             const squares = document.querySelectorAll('.square');
+            const boardArray = chessGame.board();
             
-            squares.forEach(square => {
-                const row = parseInt(square.dataset.row);
-                const col = parseInt(square.dataset.col);
+            squares.forEach((square, index) => {
+                const row = Math.floor(index / 8);
+                const col = index % 8;
                 
-                // Inverser l'affichage si on joue noir
-                const displayRow = playerColor === 'black' ? 7 - row : row;
-                const displayCol = playerColor === 'black' ? 7 - col : col;
+                // Inverser l'affichage si on joue noir en mode partie
+                let displayRow = row;
+                let displayCol = col;
                 
-                const piece = currentBoard[displayRow][displayCol];
-                square.textContent = piece ? PIECES[piece] : '';
+                if (gameMode === 'game' && playerColor === 'black') {
+                    displayRow = 7 - row;
+                    displayCol = 7 - col;
+                }
+                
+                const piece = boardArray[displayRow][displayCol];
                 
                 // Réinitialiser les classes
                 square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                
+                // Afficher la pièce
+                if (piece) {
+                    const pieceSymbol = piece.type.toUpperCase();
+                    const pieceColor = piece.color === 'w' ? pieceSymbol : pieceSymbol.toLowerCase();
+                    square.textContent = PIECES[pieceColor] || '';
+                    square.classList.add('piece');
+                } else {
+                    square.textContent = '';
+                }
             });
             
+            // Marquer le roi en échec
+            if (chessGame.in_check()) {
+                const turn = chessGame.turn();
+                const kingSquare = findKingSquare(turn);
+                if (kingSquare) {
+                    const square = document.querySelector(`[data-row="${kingSquare.row}"][data-col="${kingSquare.col}"]`);
+                    if (square) square.classList.add('check');
+                }
+            }
+            
             console.log('✅ Échiquier rendu');
+        }
+
+        // Trouver la position du roi
+        function findKingSquare(color) {
+            const boardArray = chessGame.board();
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const piece = boardArray[row][col];
+                    if (piece && piece.type === 'k' && piece.color === color) {
+                        return { row, col };
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Réinitialiser à la position sauvegardée
+        function resetToCurrentFen() {
+            loadPosition(savedFen);
+            clearHighlights();
+            selectedSquare = null;
+            updateStatus('Position réinitialisée', 'playing');
         }
 
         // Recharger une nouvelle position
@@ -878,7 +942,6 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // Filtrer pour ne pas afficher l'utilisateur actuel
                     const otherPlayers = data.players.filter(p => currentUser && p.id !== currentUser.id);
                     
                     document.getElementById('onlineCount').textContent = data.count;
@@ -893,7 +956,6 @@
             }
         }
 
-        // Afficher la liste des joueurs
         function displayOnlinePlayers(players) {
             const listDiv = document.getElementById('playersList');
             
@@ -917,7 +979,6 @@
             `).join('');
         }
 
-        // Charger la liste des défis
         async function loadChallenges() {
             try {
                 const response = await fetch(`${API_URL}/api/challenges`, {
@@ -940,7 +1001,6 @@
             }
         }
 
-        // Afficher la liste des défis
         function displayChallenges(challenges) {
             const listDiv = document.getElementById('challengesList');
             
@@ -976,7 +1036,6 @@
             }).join('');
         }
 
-        // Créer un défi
         async function createChallenge() {
             const btn = document.getElementById('createChallengeBtn');
             btn.disabled = true;
@@ -1011,7 +1070,6 @@
             }
         }
 
-        // Accepter un défi
         async function acceptChallenge(challengeId) {
             try {
                 const response = await fetch(`${API_URL}/api/challenges/${challengeId}/accept`, {
@@ -1023,7 +1081,6 @@
 
                 if (data.success) {
                     updateStatus('✅ Défi accepté ! La partie commence...', 'playing');
-                    // Le WebSocket recevra l'événement challenge_accepted
                 } else {
                     updateStatus('❌ ' + data.error, 'waiting');
                 }
@@ -1033,7 +1090,6 @@
             }
         }
 
-        // Annuler un défi
         async function cancelChallenge(challengeId) {
             try {
                 const response = await fetch(`${API_URL}/api/challenges/${challengeId}/cancel`, {
@@ -1054,7 +1110,6 @@
             }
         }
 
-        // Défier un joueur spécifique
         async function challengePlayer(playerId, playerName) {
             if (!confirm(`Voulez-vous défier ${playerName} avec la position actuelle ?`)) {
                 return;
@@ -1063,7 +1118,6 @@
             await createChallenge();
         }
 
-        // Connecter WebSocket
         function connectWebSocket() {
             socket = io(API_URL, {
                 transports: ['websocket', 'polling'],
@@ -1073,7 +1127,6 @@
             socket.on('connect', () => {
                 console.log('✅ WebSocket connecté');
                 updateStatus('✅ Connexion établie', 'playing');
-                console.log('✅ Connexion établie:', { sid: socket.id, async_mode: socket.io.engine.transport.name });
             });
 
             socket.on('disconnect', () => {
@@ -1092,30 +1145,12 @@
 
             socket.on('game_start', (data) => {
                 console.log('🎮 Partie commencée:', data);
-                currentGame = data;
-                playerColor = data.color;
-                
-                loadPosition(data.fen);
-                
-                document.getElementById('opponentName').textContent = data.opponent.username;
-                document.getElementById('opponentInfo').style.display = 'flex';
-                document.getElementById('playerInfo').style.display = 'flex';
-                document.getElementById('turnIndicator').style.display = 'block';
-                document.getElementById('gameControls').style.display = 'flex';
-                
-                document.getElementById('playerColor').textContent = playerColor === 'white' ? '⚪' : '⚫';
-                document.getElementById('opponentColor').textContent = playerColor === 'white' ? '⚫' : '⚪';
-                
-                updateStatus('🎮 Partie en cours !', 'playing');
-                updateTurnIndicator(data.fen);
+                startGame(data);
             });
 
             socket.on('move_made', (data) => {
                 console.log('♟️ Coup joué:', data.move);
                 loadPosition(data.fen);
-                moveHistory.push(data.move);
-                updateMoveHistory();
-                updateTurnIndicator(data.fen);
                 
                 if (data.status === 'checkmate' || data.status === 'stalemate' || data.info.result) {
                     showGameOver(data.status, data.info);
@@ -1149,7 +1184,6 @@
                 alert('Erreur: ' + data.message);
             });
 
-            // Nouveaux événements pour les défis
             socket.on('new_challenge', (data) => {
                 console.log('🆕 Nouveau défi:', data);
                 loadChallenges();
@@ -1160,55 +1194,31 @@
                 loadChallenges();
             });
 
-// Dans game.html, remplacez l'événement socket 'challenge_accepted' par celui-ci :
-
-socket.on('challenge_accepted', (data) => {
-    console.log('✅ Défi accepté:', data);
-    
-    // Vérifier si le joueur actuel est impliqué dans ce défi
-    if (currentUser && (data.challenger_id === currentUser.id || data.accepter_id === currentUser.id)) {
-        console.log('🎮 Vous êtes impliqué dans ce défi !');
-        
-        // Déterminer la couleur du joueur (aléatoire)
-        const isChallenger = data.challenger_id === currentUser.id;
-        const colors = ['white', 'black'];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        
-        // Si on est le challenger, on a la couleur random, sinon l'opposé
-        playerColor = isChallenger ? randomColor : (randomColor === 'white' ? 'black' : 'white');
-        
-        // Configurer la partie
-        currentGame = { 
-            game_id: data.game_id,
-            challenge_id: data.challenge_id
-        };
-        
-        loadPosition(data.fen);
-        
-        // Afficher les infos de l'adversaire
-        const opponentName = isChallenger ? data.accepter_name : data.challenger_name;
-        document.getElementById('opponentName').textContent = opponentName;
-        document.getElementById('opponentInfo').style.display = 'flex';
-        document.getElementById('playerInfo').style.display = 'flex';
-        document.getElementById('turnIndicator').style.display = 'block';
-        document.getElementById('gameControls').style.display = 'flex';
-        
-        // Désactiver les boutons de recherche/défi
-        document.getElementById('queueBtn').disabled = true;
-        document.getElementById('createChallengeBtn').disabled = true;
-        
-        document.getElementById('playerColor').textContent = playerColor === 'white' ? '⚪' : '⚫';
-        document.getElementById('opponentColor').textContent = playerColor === 'white' ? '⚫' : '⚪';
-        
-        updateStatus(`🎮 Partie contre ${opponentName} commencée !`, 'playing');
-        updateTurnIndicator(data.fen);
-        
-        console.log(`✅ Partie configurée - Vous jouez: ${playerColor}`);
-    }
-    
-    // Rafraîchir la liste des défis pour tous les joueurs
-    loadChallenges();
-});
+            socket.on('challenge_accepted', (data) => {
+                console.log('✅ Défi accepté:', data);
+                
+                if (currentUser && (data.challenger_id === currentUser.id || data.accepter_id === currentUser.id)) {
+                    console.log('🎮 Vous êtes impliqué dans ce défi !');
+                    
+                    const isChallenger = data.challenger_id === currentUser.id;
+                    const colors = ['white', 'black'];
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    playerColor = isChallenger ? randomColor : (randomColor === 'white' ? 'black' : 'white');
+                    
+                    startGame({
+                        game_id: data.game_id,
+                        challenge_id: data.challenge_id,
+                        color: playerColor,
+                        fen: data.fen,
+                        opponent: {
+                            username: isChallenger ? data.accepter_name : data.challenger_name
+                        }
+                    });
+                }
+                
+                loadChallenges();
+            });
 
             socket.on('player_online', (data) => {
                 console.log('✅ Joueur en ligne:', data.username);
@@ -1221,7 +1231,36 @@ socket.on('challenge_accepted', (data) => {
             });
         }
 
-        // Rejoindre la file d'attente
+        function startGame(data) {
+            gameMode = 'game';
+            currentGame = data;
+            playerColor = data.color;
+            
+            loadPosition(data.fen);
+            
+            document.getElementById('modeIndicator').textContent = '🎮 Partie en cours';
+            document.getElementById('modeIndicator').className = 'mode-indicator game';
+            
+            document.getElementById('opponentName').textContent = data.opponent.username;
+            document.getElementById('opponentInfo').style.display = 'flex';
+            document.getElementById('playerInfo').style.display = 'flex';
+            document.getElementById('turnIndicator').style.display = 'block';
+            document.getElementById('gameControls').style.display = 'flex';
+            
+            document.getElementById('queueBtn').disabled = true;
+            document.getElementById('createChallengeBtn').disabled = true;
+            document.getElementById('reloadPositionBtn').disabled = true;
+            document.getElementById('resetBoardBtn').disabled = true;
+            
+            document.getElementById('playerColor').textContent = playerColor === 'white' ? '⚪' : '⚫';
+            document.getElementById('opponentColor').textContent = playerColor === 'white' ? '⚫' : '⚪';
+            
+            updateStatus(`🎮 Partie contre ${data.opponent.username} commencée !`, 'playing');
+            updateTurnIndicator();
+            
+            console.log(`✅ Partie configurée - Vous jouez: ${playerColor}`);
+        }
+
         function joinQueue() {
             if (!socket || !socket.connected) {
                 alert('WebSocket non connecté. Rechargez la page.');
@@ -1243,7 +1282,6 @@ socket.on('challenge_accepted', (data) => {
             updateStatus('⏳ Recherche d\'un adversaire...', 'waiting');
         }
 
-        // Quitter la file d'attente
         function leaveQueue() {
             if (!socket || !socket.connected) {
                 return;
@@ -1256,63 +1294,106 @@ socket.on('challenge_accepted', (data) => {
 
         // Gérer le clic sur une case
         function handleSquareClick(row, col) {
-            if (!currentGame || !playerColor) {
-                return;
+            const square = convertToAlgebraic(row, col);
+            
+            // En mode analyse, on peut toujours jouer
+            if (gameMode === 'analysis') {
+                handleAnalysisMode(row, col, square);
+            } else {
+                // En mode partie, vérifier si c'est notre tour
+                handleGameMode(row, col, square);
             }
+        }
 
-            const turn = currentFen.split(' ')[1];
-            const isWhiteTurn = turn === 'w';
-            const canMove = (isWhiteTurn && playerColor === 'white') || (!isWhiteTurn && playerColor === 'black');
-
-            if (!canMove) {
-                console.log('⏸️ Ce n\'est pas votre tour');
-                return;
-            }
-
-            // Logique de sélection de pièce et de mouvement (simplifiée)
+        function handleAnalysisMode(row, col, square) {
             if (selectedSquare === null) {
                 // Sélectionner une pièce
-                const displayRow = playerColor === 'black' ? 7 - row : row;
-                const displayCol = playerColor === 'black' ? 7 - col : col;
-                const piece = currentBoard[displayRow][displayCol];
-
+                const piece = chessGame.get(square);
                 if (piece) {
-                    const isWhitePiece = piece === piece.toUpperCase();
-                    if ((isWhitePiece && playerColor === 'white') || (!isWhitePiece && playerColor === 'black')) {
-                        selectedSquare = { row: displayRow, col: displayCol };
-                        highlightSquare(row, col);
-                        console.log('✅ Pièce sélectionnée:', piece);
-                    }
+                    selectedSquare = square;
+                    legalMoves = chessGame.moves({ square: square, verbose: true });
+                    highlightSquare(row, col);
+                    highlightLegalMoves(legalMoves);
+                    console.log('✅ Pièce sélectionnée:', piece.type, '- Coups légaux:', legalMoves.length);
                 }
             } else {
                 // Tenter de déplacer la pièce
-                const displayRow = playerColor === 'black' ? 7 - row : row;
-                const displayCol = playerColor === 'black' ? 7 - col : col;
-                
-                const fromSquare = convertToChessNotation(selectedSquare.row, selectedSquare.col);
-                const toSquare = convertToChessNotation(displayRow, displayCol);
-                const move = fromSquare + toSquare;
-
-                console.log('🎯 Tentative de coup:', move);
-                
-                socket.emit('make_move', {
-                    game_id: currentGame.game_id,
-                    move: move
+                const move = chessGame.move({
+                    from: selectedSquare,
+                    to: square,
+                    promotion: 'q' // Toujours promouvoir en dame pour simplifier
                 });
+
+                if (move) {
+                    console.log('✅ Coup joué:', move.san);
+                    currentFen = chessGame.fen();
+                    document.getElementById('currentFen').textContent = currentFen;
+                    renderBoard();
+                    updateMoveHistory();
+                } else {
+                    console.log('❌ Coup illégal');
+                }
 
                 selectedSquare = null;
                 clearHighlights();
             }
         }
 
-        // Convertir coordonnées en notation d'échecs
-        function convertToChessNotation(row, col) {
+        function handleGameMode(row, col, square) {
+            if (!currentGame || !playerColor) {
+                return;
+            }
+
+            const turn = chessGame.turn();
+            const canMove = (turn === 'w' && playerColor === 'white') || (turn === 'b' && playerColor === 'black');
+
+            if (!canMove) {
+                console.log('⏸️ Ce n\'est pas votre tour');
+                return;
+            }
+
+            if (selectedSquare === null) {
+                const piece = chessGame.get(square);
+                if (piece && piece.color === turn) {
+                    selectedSquare = square;
+                    legalMoves = chessGame.moves({ square: square, verbose: true });
+                    highlightSquare(row, col);
+                    highlightLegalMoves(legalMoves);
+                    console.log('✅ Pièce sélectionnée:', piece.type);
+                }
+            } else {
+                const move = chessGame.move({
+                    from: selectedSquare,
+                    to: square,
+                    promotion: 'q'
+                });
+
+                if (move) {
+                    console.log('🎯 Envoi du coup:', move.from + move.to);
+                    socket.emit('make_move', {
+                        game_id: currentGame.game_id,
+                        move: move.from + move.to
+                    });
+                }
+
+                selectedSquare = null;
+                clearHighlights();
+            }
+        }
+
+        function convertToAlgebraic(row, col) {
             const files = 'abcdefgh';
             const ranks = '87654321';
+            
+            // Ajuster si on joue noir en mode partie
+            if (gameMode === 'game' && playerColor === 'black') {
+                row = 7 - row;
+                col = 7 - col;
+            }
+            
             return files[col] + ranks[row];
         }
 
-        // Mettre en surbrillance une case
         function highlightSquare(row, col) {
             const squares = document.querySelectorAll('.square');
             squares.forEach(sq => {
@@ -1322,7 +1403,26 @@ socket.on('challenge_accepted', (data) => {
             });
         }
 
-        // Effacer les surbrillances
+        function highlightLegalMoves(moves) {
+            moves.forEach(move => {
+                const file = move.to.charCodeAt(0) - 'a'.charCodeAt(0);
+                const rank = 8 - parseInt(move.to[1]);
+                
+                let displayRow = rank;
+                let displayCol = file;
+                
+                if (gameMode === 'game' && playerColor === 'black') {
+                    displayRow = 7 - rank;
+                    displayCol = 7 - file;
+                }
+                
+                const square = document.querySelector(`[data-row="${displayRow}"][data-col="${displayCol}"]`);
+                if (square) {
+                    square.classList.add('legal-move');
+                }
+            });
+        }
+
         function clearHighlights() {
             const squares = document.querySelectorAll('.square');
             squares.forEach(sq => {
@@ -1330,11 +1430,9 @@ socket.on('challenge_accepted', (data) => {
             });
         }
 
-        // Mettre à jour l'indicateur de tour
-        function updateTurnIndicator(fen) {
-            const turn = fen.split(' ')[1];
-            const isWhiteTurn = turn === 'w';
-            const isMyTurn = (isWhiteTurn && playerColor === 'white') || (!isWhiteTurn && playerColor === 'black');
+        function updateTurnIndicator() {
+            const turn = chessGame.turn();
+            const isMyTurn = (turn === 'w' && playerColor === 'white') || (turn === 'b' && playerColor === 'black');
 
             const indicator = document.getElementById('turnIndicator');
             if (isMyTurn) {
@@ -1346,16 +1444,16 @@ socket.on('challenge_accepted', (data) => {
             }
         }
 
-        // Mettre à jour l'historique des coups
         function updateMoveHistory() {
             const historyDiv = document.getElementById('moveHistory');
+            const history = chessGame.history();
             
-            if (moveHistory.length === 0) {
+            if (history.length === 0) {
                 historyDiv.innerHTML = '<p style="text-align: center; color: #999;">Aucun coup joué</p>';
                 return;
             }
 
-            historyDiv.innerHTML = moveHistory.map((move, index) => {
+            historyDiv.innerHTML = history.map((move, index) => {
                 const moveNumber = Math.floor(index / 2) + 1;
                 const isWhiteMove = index % 2 === 0;
                 return `<div class="move-item">${isWhiteMove ? moveNumber + '.' : ''} ${move}</div>`;
@@ -1364,7 +1462,6 @@ socket.on('challenge_accepted', (data) => {
             historyDiv.scrollTop = historyDiv.scrollHeight;
         }
 
-        // Abandonner
         function resign() {
             if (!currentGame) {
                 return;
@@ -1375,7 +1472,6 @@ socket.on('challenge_accepted', (data) => {
             }
         }
 
-        // Proposer une nulle
         function offerDraw() {
             if (!currentGame) {
                 return;
@@ -1385,7 +1481,6 @@ socket.on('challenge_accepted', (data) => {
             alert('Proposition de nulle envoyée à votre adversaire');
         }
 
-        // Afficher le modal de fin de partie
         function showGameOver(result, info) {
             const modal = document.getElementById('gameOverModal');
             const title = document.getElementById('gameOverTitle');
@@ -1410,30 +1505,34 @@ socket.on('challenge_accepted', (data) => {
             message.textContent = messageText;
             modal.classList.add('show');
 
-            // Réinitialiser après 3 secondes
             setTimeout(() => {
                 resetGame();
             }, 3000);
         }
 
-        // Fermer le modal de fin de partie
         function closeGameOverModal() {
             document.getElementById('gameOverModal').classList.remove('show');
             resetGame();
         }
 
-        // Réinitialiser le jeu
         function resetGame() {
+            gameMode = 'analysis';
             currentGame = null;
             playerColor = null;
             selectedSquare = null;
-            moveHistory = [];
 
+            document.getElementById('modeIndicator').textContent = '📊 Mode Analyse';
+            document.getElementById('modeIndicator').className = 'mode-indicator analysis';
+            
             document.getElementById('opponentInfo').style.display = 'none';
             document.getElementById('playerInfo').style.display = 'none';
             document.getElementById('turnIndicator').style.display = 'none';
             document.getElementById('gameControls').style.display = 'none';
+            
             document.getElementById('queueBtn').disabled = false;
+            document.getElementById('createChallengeBtn').disabled = false;
+            document.getElementById('reloadPositionBtn').disabled = false;
+            document.getElementById('resetBoardBtn').disabled = false;
 
             clearHighlights();
             updateStatus('Choisissez une action pour commencer', 'waiting');
@@ -1441,14 +1540,12 @@ socket.on('challenge_accepted', (data) => {
             loadPosition(currentFen);
         }
 
-        // Mettre à jour le statut
         function updateStatus(message, type) {
             const statusDiv = document.getElementById('statusMessage');
             statusDiv.textContent = message;
             statusDiv.className = `status-message ${type}`;
         }
 
-        // Déconnexion
         async function handleLogout() {
             if (currentGame) {
                 alert('Vous ne pouvez pas vous déconnecter pendant une partie !');
