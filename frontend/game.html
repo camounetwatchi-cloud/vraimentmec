@@ -717,6 +717,46 @@
             }
         }
 
+        // Marquer le joueur comme en ligne
+        async function setPlayerOnline() {
+            try {
+                const response = await fetch(`${API_URL}/api/players/set-online`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('✅ Statut en ligne défini');
+                } else {
+                    console.warn('⚠️ Erreur statut en ligne:', data.error);
+                }
+            } catch (error) {
+                console.error('❌ Erreur setPlayerOnline:', error);
+            }
+        }
+
+        // Marquer le joueur comme hors ligne
+        async function setPlayerOffline() {
+            try {
+                const response = await fetch(`${API_URL}/api/players/set-offline`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('✅ Statut hors ligne défini');
+                } else {
+                    console.warn('⚠️ Erreur statut hors ligne:', data.error);
+                }
+            } catch (error) {
+                console.error('❌ Erreur setPlayerOffline:', error);
+            }
+        }
+
         // Initialiser l'échiquier
         function initializeBoard() {
             const chessboard = document.getElementById('chessboard');
@@ -824,7 +864,7 @@
             }
         }
 
-        // Charger la liste des joueurs connectés (VRAIS joueurs)
+        // Charger la liste des joueurs connectés
         async function loadOnlinePlayers() {
             try {
                 const response = await fetch(`${API_URL}/api/players/online`, {
@@ -877,7 +917,7 @@
             `).join('');
         }
 
-        // Charger la liste des défis (VRAIS défis depuis le backend)
+        // Charger la liste des défis
         async function loadChallenges() {
             try {
                 const response = await fetch(`${API_URL}/api/challenges`, {
@@ -905,350 +945,4 @@
             const listDiv = document.getElementById('challengesList');
             
             if (challenges.length === 0) {
-                listDiv.innerHTML = '<div class="empty-state">Aucun défi pour le moment</div>';
-                return;
-            }
-
-            listDiv.innerHTML = challenges.map(challenge => `
-                <div class="challenge-item">
-                    <div class="challenge-info">
-                        <div class="challenge-player">${challenge.challenger_name}</div>
-                        <div class="challenge-time">ELO: ${challenge.challenger_elo}</div>
-                    </div>
-                    ${challenge.challenger_id !== currentUser.id ? 
-                        `<button class="accept-btn" onclick="acceptChallenge('${challenge.id}')">Accepter</button>` 
-                        : '<small style="color: #999;">Votre défi</small>'}
-                </div>
-            `).join('');
-        }
-
-        // Créer un défi
-        async function createChallenge() {
-            alert('Fonctionnalité "Créer un défi" en cours de développement.\nPosition actuelle: ' + currentFen);
-        }
-
-        // Défier un joueur
-        function challengePlayer(playerId, playerName) {
-            if (confirm(`Défier ${playerName} avec la position actuelle ?`)) {
-                alert('Fonctionnalité en cours de développement');
-            }
-        }
-
-        // Accepter un défi
-        async function acceptChallenge(challengeId) {
-            alert('Fonctionnalité "Accepter un défi" en cours de développement');
-        }
-
-        // Gérer le clic sur une case
-        function handleSquareClick(row, col) {
-            if (!currentGame) {
-                console.log('Aucune partie en cours');
-                return;
-            }
-            
-            const boardRow = playerColor === 'black' ? 7 - row : row;
-            const boardCol = playerColor === 'black' ? 7 - col : col;
-            
-            const piece = currentBoard[boardRow][boardCol];
-            
-            if (selectedSquare) {
-                const from = indexToSquare(selectedSquare.row, selectedSquare.col);
-                const to = indexToSquare(boardRow, boardCol);
-                const move = from + to;
-                
-                makeMove(move);
-                
-                selectedSquare = null;
-                renderBoard();
-            } else if (piece && isMyPiece(piece)) {
-                selectedSquare = { row: boardRow, col: boardCol };
-                highlightSquare(row, col);
-            }
-        }
-
-        // Vérifier si c'est ma pièce
-        function isMyPiece(piece) {
-            const isWhite = piece === piece.toUpperCase();
-            return (playerColor === 'white' && isWhite) || (playerColor === 'black' && !isWhite);
-        }
-
-        // Convertir index en notation d'échecs
-        function indexToSquare(row, col) {
-            const files = 'abcdefgh';
-            const ranks = '87654321';
-            return files[col] + ranks[row];
-        }
-
-        // Surligner une case
-        function highlightSquare(row, col) {
-            const squares = document.querySelectorAll('.square');
-            squares.forEach(sq => {
-                if (sq.dataset.row == row && sq.dataset.col == col) {
-                    sq.classList.add('selected');
-                }
-            });
-        }
-
-        // Faire un coup
-        function makeMove(move) {
-            if (!currentGame) return;
-            
-            socket.emit('make_move', {
-                game_id: currentGame.game_id,
-                move: move
-            });
-        }
-
-        // Déconnexion
-        async function handleLogout() {
-            try {
-                await fetch(`${API_URL}/api/auth/logout`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-                
-                if (socket) socket.disconnect();
-                window.location.href = 'auth.html';
-            } catch (error) {
-                console.error('❌ Erreur de déconnexion:', error);
-            }
-        }
-
-        // Connexion WebSocket
-        function connectWebSocket() {
-            socket = io(API_URL, {
-                transports: ['websocket', 'polling'],
-                withCredentials: true
-            });
-
-            socket.on('connect', () => {
-                console.log('✅ WebSocket connecté');
-            });
-
-            socket.on('connection_established', (data) => {
-                console.log('✅ Connexion établie:', data);
-            });
-
-            socket.on('queue_joined', (data) => {
-                console.log('✅ File d\'attente rejointe');
-                updateStatus('En attente d\'un adversaire...', 'waiting');
-                document.getElementById('queueBtn').textContent = '⏳ En attente...';
-                document.getElementById('queueBtn').disabled = true;
-            });
-
-            socket.on('game_start', (data) => {
-                console.log('✅ Partie commencée:', data);
-                startGame(data);
-            });
-
-            socket.on('move_made', (data) => {
-                console.log('📥 Coup reçu:', data);
-                handleMoveMade(data);
-            });
-
-            socket.on('game_over', (data) => {
-                console.log('🏁 Partie terminée:', data);
-                handleGameOver(data);
-            });
-
-            socket.on('opponent_disconnected', (data) => {
-                console.log('⚠️ Adversaire déconnecté');
-                alert('Votre adversaire s\'est déconnecté. Vous gagnez par forfait.');
-                resetGame();
-            });
-
-            socket.on('draw_offered', (data) => {
-                if (confirm('Votre adversaire propose une nulle. Accepter ?')) {
-                    socket.emit('accept_draw', { game_id: currentGame.game_id });
-                }
-            });
-
-            socket.on('invalid_move', (data) => {
-                alert('Coup invalide: ' + data.message);
-            });
-
-            socket.on('error', (data) => {
-                console.error('❌ Erreur:', data);
-                alert('Erreur: ' + data.message);
-            });
-
-            socket.on('disconnect', () => {
-                console.log('❌ WebSocket déconnecté');
-                updateStatus('Connexion perdue...', 'waiting');
-            });
-        }
-
-        // Rejoindre la file d'attente
-        function joinQueue() {
-            if (!currentUser) {
-                alert('Vous devez être connecté');
-                return;
-            }
-
-            socket.emit('join_queue', {
-                user_id: currentUser.id,
-                username: currentUser.username,
-                elo: currentUser.elo
-            });
-        }
-
-        // Démarrer une partie
-        function startGame(data) {
-            currentGame = data;
-            playerColor = data.color;
-            moveHistory = [];
-            
-            document.getElementById('opponentInfo').style.display = 'flex';
-            document.getElementById('playerInfo').style.display = 'flex';
-            document.getElementById('gameControls').style.display = 'flex';
-            document.getElementById('turnIndicator').style.display = 'block';
-            
-            document.getElementById('opponentName').textContent = data.opponent.username;
-            document.getElementById('playerName').textContent = currentUser.username;
-            
-            document.getElementById('playerColor').textContent = playerColor === 'white' ? '⚪' : '⚫';
-            document.getElementById('opponentColor').textContent = playerColor === 'white' ? '⚫' : '⚪';
-            
-            loadPosition(data.fen);
-            
-            const isMyTurn = (playerColor === 'white' && data.game_info.turn === 'white') ||
-                            (playerColor === 'black' && data.game_info.turn === 'black');
-            updateTurnIndicator(isMyTurn);
-            
-            updateStatus('Partie en cours !', 'playing');
-            
-            document.getElementById('queueBtn').style.display = 'none';
-        }
-
-        // Gérer un coup effectué
-        function handleMoveMade(data) {
-            loadPosition(data.fen);
-            
-            moveHistory.push(data.move);
-            updateMoveHistory();
-            
-            const fenParts = data.fen.split(' ');
-            const turn = fenParts[1];
-            const isMyTurn = (playerColor === 'white' && turn === 'w') ||
-                            (playerColor === 'black' && turn === 'b');
-            updateTurnIndicator(isMyTurn);
-            
-            if (data.status !== 'running' && data.status !== 'check') {
-                handleGameOver({ result: data.info.result, reason: data.status });
-            }
-        }
-
-        // Mettre à jour l'indicateur de tour
-        function updateTurnIndicator(isMyTurn) {
-            const indicator = document.getElementById('turnIndicator');
-            if (isMyTurn) {
-                indicator.textContent = '🟢 À votre tour de jouer';
-                indicator.className = 'status-message your-turn';
-            } else {
-                indicator.textContent = '⏳ Tour de l\'adversaire';
-                indicator.className = 'status-message waiting';
-            }
-        }
-
-        // Mettre à jour l'historique des coups
-        function updateMoveHistory() {
-            const historyDiv = document.getElementById('moveHistory');
-            historyDiv.innerHTML = '';
-            
-            for (let i = 0; i < moveHistory.length; i += 2) {
-                const moveNum = Math.floor(i / 2) + 1;
-                const whiteMove = moveHistory[i];
-                const blackMove = moveHistory[i + 1] || '';
-                
-                const moveItem = document.createElement('div');
-                moveItem.className = 'move-item';
-                moveItem.textContent = `${moveNum}. ${whiteMove} ${blackMove}`;
-                historyDiv.appendChild(moveItem);
-            }
-            
-            historyDiv.scrollTop = historyDiv.scrollHeight;
-        }
-
-        // Gérer la fin de partie
-        function handleGameOver(data) {
-            const modal = document.getElementById('gameOverModal');
-            const title = document.getElementById('gameOverTitle');
-            const message = document.getElementById('gameOverMessage');
-            
-            let resultText = '';
-            
-            if (data.result === 'white_win') {
-                resultText = playerColor === 'white' ? '🎉 Vous avez gagné !' : '😢 Vous avez perdu';
-            } else if (data.result === 'black_win') {
-                resultText = playerColor === 'black' ? '🎉 Vous avez gagné !' : '😢 Vous avez perdu';
-            } else if (data.result === 'draw') {
-                resultText = '🤝 Partie nulle';
-            }
-            
-            title.textContent = resultText;
-            message.textContent = `Raison: ${data.reason || 'Fin de partie'}`;
-            
-            modal.classList.add('show');
-            
-            setTimeout(() => {
-                checkAuthentication();
-            }, 1000);
-        }
-
-        // Fermer le modal
-        function closeGameOverModal() {
-            document.getElementById('gameOverModal').classList.remove('show');
-            resetGame();
-        }
-
-        // Réinitialiser la partie
-        function resetGame() {
-            currentGame = null;
-            playerColor = null;
-            selectedSquare = null;
-            moveHistory = [];
-            
-            document.getElementById('opponentInfo').style.display = 'none';
-            document.getElementById('playerInfo').style.display = 'none';
-            document.getElementById('gameControls').style.display = 'none';
-            document.getElementById('turnIndicator').style.display = 'none';
-            document.getElementById('queueBtn').style.display = 'block';
-            document.getElementById('queueBtn').textContent = '🎲 Partie rapide';
-            document.getElementById('queueBtn').disabled = false;
-            
-            updateStatus('Choisissez une action pour commencer', 'waiting');
-            
-            loadPosition(currentFen);
-        }
-
-        // Abandonner
-        function resign() {
-            if (!currentGame) return;
-            
-            if (confirm('Êtes-vous sûr de vouloir abandonner ?')) {
-                socket.emit('resign', {
-                    game_id: currentGame.game_id
-                });
-            }
-        }
-
-        // Proposer une nulle
-        function offerDraw() {
-            if (!currentGame) return;
-            
-            socket.emit('offer_draw', {
-                game_id: currentGame.game_id
-            });
-            
-            alert('Proposition de nulle envoyée à votre adversaire');
-        }
-
-        // Mettre à jour le statut
-        function updateStatus(text, type) {
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.textContent = text;
-            statusDiv.className = `status-message ${type}`;
-        }
-    </script>
-</body>
-</html>
+                listDiv
