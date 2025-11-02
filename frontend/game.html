@@ -327,10 +327,10 @@
             border: 3px solid #f3f3f3;
             border-top: 3px solid #667eea;
             border-radius: 50%;
-            width: 20px;
-            height: 20px;
+            width: 30px;
+            height: 30px;
             animation: spin 1s linear infinite;
-            margin: 10px auto;
+            margin: 20px auto;
         }
 
         @keyframes spin {
@@ -392,7 +392,6 @@
             background: #5568d3;
         }
 
-        /* Nouvelles sections */
         .challenges-list, .players-list {
             max-height: 250px;
             overflow-y: auto;
@@ -544,11 +543,11 @@
                     🎲 Partie rapide
                 </button>
 
-                <button id="reloadPositionBtn" class="action-btn secondary" onclick="reloadPosition()">
+                <button id="reloadPositionBtn" class="action-btn secondary">
                     🔄 Nouvelle position
                 </button>
 
-                <button id="createChallengeBtn" class="action-btn secondary" onclick="createChallenge()">
+                <button id="createChallengeBtn" class="action-btn secondary">
                     ⚔️ Créer un défi
                 </button>
 
@@ -618,7 +617,7 @@
             <div class="side-panel">
                 <h2>Joueurs connectés (<span id="onlineCount">0</span>)</h2>
                 <div class="players-list" id="playersList">
-                    <div class="loader"></div>
+                    <div class="empty-state">Chargement...</div>
                 </div>
             </div>
         </div>
@@ -664,12 +663,21 @@
         // Initialisation
         window.addEventListener('load', async () => {
             await checkAuthentication();
+            initializeBoard();
             loadPosition(currentFen);
             connectWebSocket();
+            
+            // Attacher les événements aux boutons
+            document.getElementById('reloadPositionBtn').addEventListener('click', reloadPosition);
+            document.getElementById('createChallengeBtn').addEventListener('click', createChallenge);
+            
+            // Charger les listes (simulation pour l'instant)
             loadOnlinePlayers();
             loadChallenges();
-            setInterval(loadOnlinePlayers, 5000);
-            setInterval(loadChallenges, 3000);
+            
+            // Rafraîchir périodiquement
+            setInterval(loadOnlinePlayers, 10000);
+            setInterval(loadChallenges, 5000);
         });
 
         // Vérifier l'authentification
@@ -700,6 +708,76 @@
             }
         }
 
+        // Initialiser l'échiquier
+        function initializeBoard() {
+            const chessboard = document.getElementById('chessboard');
+            chessboard.innerHTML = '';
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const square = document.createElement('div');
+                    square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                    square.dataset.row = row;
+                    square.dataset.col = col;
+                    square.onclick = () => handleSquareClick(row, col);
+                    chessboard.appendChild(square);
+                }
+            }
+            
+            console.log('✅ Échiquier initialisé');
+        }
+
+        // Parser FEN
+        function parseFEN(fen) {
+            const board = Array(8).fill(null).map(() => Array(8).fill(null));
+            const rows = fen.split(' ')[0].split('/');
+            
+            for (let i = 0; i < 8; i++) {
+                let col = 0;
+                for (let char of rows[i]) {
+                    if (isNaN(char)) {
+                        board[i][col] = char;
+                        col++;
+                    } else {
+                        col += parseInt(char);
+                    }
+                }
+            }
+            
+            return board;
+        }
+
+        // Charger une position FEN
+        function loadPosition(fen) {
+            console.log('📋 Chargement FEN:', fen);
+            currentBoard = parseFEN(fen);
+            currentFen = fen;
+            document.getElementById('currentFen').textContent = fen;
+            renderBoard();
+        }
+
+        // Rendre l'échiquier
+        function renderBoard() {
+            const squares = document.querySelectorAll('.square');
+            
+            squares.forEach(square => {
+                const row = parseInt(square.dataset.row);
+                const col = parseInt(square.dataset.col);
+                
+                // Inverser l'affichage si on joue noir
+                const displayRow = playerColor === 'black' ? 7 - row : row;
+                const displayCol = playerColor === 'black' ? 7 - col : col;
+                
+                const piece = currentBoard[displayRow][displayCol];
+                square.textContent = piece ? PIECES[piece] : '';
+                
+                // Réinitialiser les classes
+                square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+            });
+            
+            console.log('✅ Échiquier rendu');
+        }
+
         // Recharger une nouvelle position
         async function reloadPosition() {
             const btn = document.getElementById('reloadPositionBtn');
@@ -723,9 +801,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    currentFen = data.data.fen;
-                    document.getElementById('currentFen').textContent = currentFen;
-                    loadPosition(currentFen);
+                    loadPosition(data.data.fen);
                     updateStatus('✅ Nouvelle position chargée !', 'playing');
                 } else {
                     updateStatus('❌ Erreur de génération', 'waiting');
@@ -739,21 +815,21 @@
             }
         }
 
-        // Charger la liste des joueurs connectés
+        // Charger la liste des joueurs connectés (simulation temporaire)
         async function loadOnlinePlayers() {
             try {
-                const response = await fetch(`${API_URL}/api/players/online`, {
-                    credentials: 'include'
-                });
+                // Pour l'instant, on simule les données car l'endpoint n'existe pas encore
+                const mockPlayers = [
+                    { id: '1', username: 'Joueur1', elo: 1450, in_game: false },
+                    { id: '2', username: 'Joueur2', elo: 1380, in_game: true },
+                    { id: '3', username: 'Joueur3', elo: 1520, in_game: false }
+                ].filter(p => currentUser && p.id !== currentUser.id);
 
-                const data = await response.json();
-
-                if (data.success) {
-                    document.getElementById('onlineCount').textContent = data.players.length;
-                    displayOnlinePlayers(data.players);
-                }
+                document.getElementById('onlineCount').textContent = mockPlayers.length + 1;
+                displayOnlinePlayers(mockPlayers);
             } catch (error) {
                 console.error('❌ Erreur chargement joueurs:', error);
+                document.getElementById('playersList').innerHTML = '<div class="empty-state">Erreur de chargement</div>';
             }
         }
 
@@ -762,7 +838,7 @@
             const listDiv = document.getElementById('playersList');
             
             if (players.length === 0) {
-                listDiv.innerHTML = '<div class="empty-state">Aucun joueur en ligne</div>';
+                listDiv.innerHTML = '<div class="empty-state">Vous êtes seul en ligne</div>';
                 return;
             }
 
@@ -774,25 +850,19 @@
                         <br>
                         <small>ELO: ${player.elo}</small>
                     </div>
-                    ${player.id !== currentUser.id && !player.in_game ? 
+                    ${!player.in_game ? 
                         `<button class="challenge-btn" onclick="challengePlayer('${player.id}', '${player.username}')">Défier</button>` 
-                        : ''}
+                        : '<small style="color: #999;">En partie</small>'}
                 </div>
             `).join('');
         }
 
-        // Charger la liste des défis
+        // Charger la liste des défis (simulation temporaire)
         async function loadChallenges() {
             try {
-                const response = await fetch(`${API_URL}/api/challenges`, {
-                    credentials: 'include'
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    displayChallenges(data.challenges);
-                }
+                // Simulation temporaire
+                const mockChallenges = [];
+                displayChallenges(mockChallenges);
             } catch (error) {
                 console.error('❌ Erreur chargement défis:', error);
             }
@@ -822,133 +892,41 @@
 
         // Créer un défi
         async function createChallenge() {
-            try {
-                const response = await fetch(`${API_URL}/api/challenges/create`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        fen: currentFen
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    updateStatus('✅ Défi créé ! En attente d\'un adversaire...', 'waiting');
-                    loadChallenges();
-                } else {
-                    alert('Erreur: ' + data.error);
-                }
-            } catch (error) {
-                console.error('❌ Erreur:', error);
-                alert('Erreur de connexion');
-            }
+            alert('Fonctionnalité "Créer un défi" en cours de développement.\nPosition actuelle: ' + currentFen);
         }
 
         // Défier un joueur
         function challengePlayer(playerId, playerName) {
             if (confirm(`Défier ${playerName} avec la position actuelle ?`)) {
-                createChallenge();
+                alert('Fonctionnalité en cours de développement');
             }
         }
 
         // Accepter un défi
         async function acceptChallenge(challengeId) {
-            try {
-                const response = await fetch(`${API_URL}/api/challenges/${challengeId}/accept`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    updateStatus('✅ Défi accepté ! Démarrage de la partie...', 'playing');
-                } else {
-                    alert('Erreur: ' + data.error);
-                }
-            } catch (error) {
-                console.error('❌ Erreur:', error);
-                alert('Erreur de connexion');
-            }
+            alert('Fonctionnalité "Accepter un défi" en cours de développement');
         }
 
-        // Déconnexion
-        async function handleLogout() {
-            try {
-                await fetch(`${API_URL}/api/auth/logout`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
+        // Gérer le clic sur une case
+        function handleSquareClick(row, col) {
+            if (!currentGame) {
+                console.log('Aucune partie en cours');
+                return;
+            }
+            
+            const boardRow = playerColor === 'black' ? 7 - row : row;
+            const boardCol = playerColor === 'black' ? 7 - col : col;
+            
+            const piece = currentBoard[boardRow][boardCol];
+            
+            if (selectedSquare) {
+                const from = indexToSquare(selectedSquare.row, selectedSquare.col);
+                const to = indexToSquare(boardRow, boardCol);
+                const move = from + to;
                 
-                if (socket) socket.disconnect();
-                window.location.href = 'auth.html';
-            } catch (error) {
-                console.error('❌ Erreur de déconnexion:', error);
-            }
-        }
-
-        // Connexion WebSocket
-        function connectWebSocket() {
-            socket = io(API_URL, {
-                transports: ['websocket', 'polling'],
-                withCredentials: true
-            });
-
-            socket.on('connect', () => {
-                console.log('✅ WebSocket connecté');
-            });
-
-            socket.on('connection_established', (data) => {
-                console.log('✅ Connexion établie:', data);
-            });
-
-            socket.on('queue_joined', (data) => {
-                console.log('✅ File d\'attente rejointe');
-                updateStatus('En attente d\'un adversaire...', 'waiting');
-                document.getElementById('queueBtn').textContent = '⏳ En attente...';
-                document.getElementById('queueBtn').disabled = true;
-            });
-
-            socket.on('game_start', (data) => {
-                console.log('✅ Partie commencée:', data);
-                startGame(data);
-            });
-
-            socket.on('move_made', (data) => {
-                console.log('📥 Coup reçu:', data);
-                handleMoveMade(data);
-            });
-
-            socket.on('game_over', (data) => {
-                console.log('🏁 Partie terminée:', data);
-                handleGameOver(data);
-            });
-
-            socket.on('opponent_disconnected', (data) => {
-                console.log('⚠️ Adversaire déconnecté');
-                alert('Votre adversaire s\'est déconnecté. Vous gagnez par forfait.');
-                resetGame();
-            });
-
-            socket.on('draw_offered', (data) => {
-                if (confirm('Votre adversaire propose une nulle. Accepter ?')) {
-                    socket.emit('accept_draw', { game_id: currentGame.game_id });
-                }
-            });
-
-            socket.on('invalid_move', (data) => {
-                alert('Coup invalide: ' + data.message);
-            });
-
-            socket.on('error', (data) => {
-                console.error('❌ Erreur:', data);
-                alert('Erreur: ' + data.message);
-            });
-
-            socket.on('disconnect', () => {
-                console.log('❌ WebSocket déconnecté');
-                updateStatus('Connexion perdue
+                makeMove(move);
+                
+                selectedSquare = null;
+                renderBoard();
+            } else if (piece && isMyPiece(piece)) {
+                selectedSquare = { row:
