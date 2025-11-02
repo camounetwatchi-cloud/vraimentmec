@@ -945,4 +945,498 @@
             const listDiv = document.getElementById('challengesList');
             
             if (challenges.length === 0) {
-                listDiv
+                listDiv.innerHTML = '<div class="empty-state">Aucun défi pour le moment</div>';
+                return;
+            }
+
+            listDiv.innerHTML = challenges.map(challenge => {
+                const isMyChallenge = currentUser && challenge.challenger_id === currentUser.id;
+                
+                if (isMyChallenge) {
+                    return `
+                        <div class="challenge-item">
+                            <div class="challenge-info">
+                                <div class="challenge-player">Votre défi</div>
+                                <div class="challenge-time">En attente...</div>
+                            </div>
+                            <button class="accept-btn" style="background: #f44336;" onclick="cancelChallenge('${challenge.id}')">Annuler</button>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="challenge-item">
+                            <div class="challenge-info">
+                                <div class="challenge-player">${challenge.challenger_name}</div>
+                                <div class="challenge-time">ELO: ${challenge.challenger_elo}</div>
+                            </div>
+                            <button class="accept-btn" onclick="acceptChallenge('${challenge.id}')">Accepter</button>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // Créer un défi
+        async function createChallenge() {
+            const btn = document.getElementById('createChallengeBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Création...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/challenges/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        fen: currentFen
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStatus('✅ Défi créé ! En attente d\'un adversaire...', 'waiting');
+                    loadChallenges();
+                } else {
+                    updateStatus('❌ ' + data.error, 'waiting');
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                updateStatus('❌ Erreur de connexion', 'waiting');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⚔️ Créer un défi';
+            }
+        }
+
+        // Accepter un défi
+        async function acceptChallenge(challengeId) {
+            try {
+                const response = await fetch(`${API_URL}/api/challenges/${challengeId}/accept`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStatus('✅ Défi accepté ! La partie commence...', 'playing');
+                    // Le WebSocket recevra l'événement challenge_accepted
+                } else {
+                    updateStatus('❌ ' + data.error, 'waiting');
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                updateStatus('❌ Erreur de connexion', 'waiting');
+            }
+        }
+
+        // Annuler un défi
+        async function cancelChallenge(challengeId) {
+            try {
+                const response = await fetch(`${API_URL}/api/challenges/${challengeId}/cancel`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStatus('Défi annulé', 'waiting');
+                    loadChallenges();
+                } else {
+                    updateStatus('❌ ' + data.error, 'waiting');
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+            }
+        }
+
+        // Défier un joueur spécifique
+        async function challengePlayer(playerId, playerName) {
+            if (!confirm(`Voulez-vous défier ${playerName} avec la position actuelle ?`)) {
+                return;
+            }
+
+            await createChallenge();
+        }
+
+        // Connecter WebSocket
+        function connectWebSocket() {
+            socket = io(API_URL, {
+                transports: ['websocket', 'polling'],
+                withCredentials: true
+            });
+
+            socket.on('connect', () => {
+                console.log('✅ WebSocket connecté');
+                updateStatus('✅ Connexion établie', 'playing');
+                console.log('✅ Connexion établie:', { sid: socket.id, async_mode: socket.io.engine.transport.name });
+            });
+
+            socket.on('disconnect', () => {
+                console.log('❌ WebSocket déconnecté');
+                updateStatus('❌ Déconnexion', 'waiting');
+            });
+
+            socket.on('connection_established', (data) => {
+                console.log('✅ Connexion confirmée:', data);
+            });
+
+            socket.on('queue_joined', (data) => {
+                console.log('✅ File d\'attente rejointe');
+                updateStatus(`⏳ En attente d'un adversaire... (${data.waiting_players} joueurs)`, 'waiting');
+            });
+
+            socket.on('game_start', (data) => {
+                console.log('🎮 Partie commencée:', data);
+                currentGame = data;
+                playerColor = data.color;
+                
+                loadPosition(data.fen);
+                
+                document.getElementById('opponentName').textContent = data.opponent.username;
+                document.getElementById('opponentInfo').style.display = 'flex';
+                document.getElementById('playerInfo').style.display = 'flex';
+                document.getElementById('turnIndicator').style.display = 'block';
+                document.getElementById('gameControls').style.display = 'flex';
+                
+                document.getElementById('playerColor').textContent = playerColor === 'white' ? '⚪' : '⚫';
+                document.getElementById('opponentColor').textContent = playerColor === 'white' ? '⚫' : '⚪';
+                
+                updateStatus('🎮 Partie en cours !', 'playing');
+                updateTurnIndicator(data.fen);
+            });
+
+            socket.on('move_made', (data) => {
+                console.log('♟️ Coup joué:', data.move);
+                loadPosition(data.fen);
+                moveHistory.push(data.move);
+                updateMoveHistory();
+                updateTurnIndicator(data.fen);
+                
+                if (data.status === 'checkmate' || data.status === 'stalemate' || data.info.result) {
+                    showGameOver(data.status, data.info);
+                }
+            });
+
+            socket.on('invalid_move', (data) => {
+                console.warn('⚠️ Coup invalide:', data.message);
+                alert(data.message);
+            });
+
+            socket.on('opponent_disconnected', (data) => {
+                console.log('❌ Adversaire déconnecté');
+                alert(data.message);
+                resetGame();
+            });
+
+            socket.on('game_over', (data) => {
+                console.log('🏁 Partie terminée:', data);
+                showGameOver(data.result, data);
+            });
+
+            socket.on('draw_offered', (data) => {
+                if (confirm(data.message + '\nAccepter la nulle ?')) {
+                    socket.emit('accept_draw', { game_id: currentGame.game_id });
+                }
+            });
+
+            socket.on('error', (data) => {
+                console.error('❌ Erreur:', data.message);
+                alert('Erreur: ' + data.message);
+            });
+
+            // Nouveaux événements pour les défis
+            socket.on('new_challenge', (data) => {
+                console.log('🆕 Nouveau défi:', data);
+                loadChallenges();
+            });
+
+            socket.on('challenge_cancelled', (data) => {
+                console.log('❌ Défi annulé:', data.challenge_id);
+                loadChallenges();
+            });
+
+            socket.on('challenge_accepted', (data) => {
+                console.log('✅ Défi accepté:', data);
+                if (currentUser && (data.challenger_id === currentUser.id || data.accepter_id === currentUser.id)) {
+                    // Le joueur est impliqué dans ce défi
+                    currentGame = { game_id: data.game_id };
+                    loadPosition(data.fen);
+                    updateStatus('🎮 Défi accepté ! La partie commence...', 'playing');
+                }
+                loadChallenges();
+            });
+
+            socket.on('player_online', (data) => {
+                console.log('✅ Joueur en ligne:', data.username);
+                loadOnlinePlayers();
+            });
+
+            socket.on('player_offline', (data) => {
+                console.log('❌ Joueur hors ligne:', data.username);
+                loadOnlinePlayers();
+            });
+        }
+
+        // Rejoindre la file d'attente
+        function joinQueue() {
+            if (!socket || !socket.connected) {
+                alert('WebSocket non connecté. Rechargez la page.');
+                return;
+            }
+
+            if (currentGame) {
+                alert('Vous êtes déjà dans une partie !');
+                return;
+            }
+
+            socket.emit('join_queue', {
+                user_id: currentUser.id,
+                username: currentUser.username,
+                elo: currentUser.elo
+            });
+
+            document.getElementById('queueBtn').disabled = true;
+            updateStatus('⏳ Recherche d\'un adversaire...', 'waiting');
+        }
+
+        // Quitter la file d'attente
+        function leaveQueue() {
+            if (!socket || !socket.connected) {
+                return;
+            }
+
+            socket.emit('leave_queue');
+            document.getElementById('queueBtn').disabled = false;
+            updateStatus('File d\'attente quittée', 'waiting');
+        }
+
+        // Gérer le clic sur une case
+        function handleSquareClick(row, col) {
+            if (!currentGame || !playerColor) {
+                return;
+            }
+
+            const turn = currentFen.split(' ')[1];
+            const isWhiteTurn = turn === 'w';
+            const canMove = (isWhiteTurn && playerColor === 'white') || (!isWhiteTurn && playerColor === 'black');
+
+            if (!canMove) {
+                console.log('⏸️ Ce n\'est pas votre tour');
+                return;
+            }
+
+            // Logique de sélection de pièce et de mouvement (simplifiée)
+            if (selectedSquare === null) {
+                // Sélectionner une pièce
+                const displayRow = playerColor === 'black' ? 7 - row : row;
+                const displayCol = playerColor === 'black' ? 7 - col : col;
+                const piece = currentBoard[displayRow][displayCol];
+
+                if (piece) {
+                    const isWhitePiece = piece === piece.toUpperCase();
+                    if ((isWhitePiece && playerColor === 'white') || (!isWhitePiece && playerColor === 'black')) {
+                        selectedSquare = { row: displayRow, col: displayCol };
+                        highlightSquare(row, col);
+                        console.log('✅ Pièce sélectionnée:', piece);
+                    }
+                }
+            } else {
+                // Tenter de déplacer la pièce
+                const displayRow = playerColor === 'black' ? 7 - row : row;
+                const displayCol = playerColor === 'black' ? 7 - col : col;
+                
+                const fromSquare = convertToChessNotation(selectedSquare.row, selectedSquare.col);
+                const toSquare = convertToChessNotation(displayRow, displayCol);
+                const move = fromSquare + toSquare;
+
+                console.log('🎯 Tentative de coup:', move);
+                
+                socket.emit('make_move', {
+                    game_id: currentGame.game_id,
+                    move: move
+                });
+
+                selectedSquare = null;
+                clearHighlights();
+            }
+        }
+
+        // Convertir coordonnées en notation d'échecs
+        function convertToChessNotation(row, col) {
+            const files = 'abcdefgh';
+            const ranks = '87654321';
+            return files[col] + ranks[row];
+        }
+
+        // Mettre en surbrillance une case
+        function highlightSquare(row, col) {
+            const squares = document.querySelectorAll('.square');
+            squares.forEach(sq => {
+                if (parseInt(sq.dataset.row) === row && parseInt(sq.dataset.col) === col) {
+                    sq.classList.add('selected');
+                }
+            });
+        }
+
+        // Effacer les surbrillances
+        function clearHighlights() {
+            const squares = document.querySelectorAll('.square');
+            squares.forEach(sq => {
+                sq.classList.remove('selected', 'legal-move');
+            });
+        }
+
+        // Mettre à jour l'indicateur de tour
+        function updateTurnIndicator(fen) {
+            const turn = fen.split(' ')[1];
+            const isWhiteTurn = turn === 'w';
+            const isMyTurn = (isWhiteTurn && playerColor === 'white') || (!isWhiteTurn && playerColor === 'black');
+
+            const indicator = document.getElementById('turnIndicator');
+            if (isMyTurn) {
+                indicator.textContent = '🟢 Votre tour de jouer';
+                indicator.className = 'status-message your-turn';
+            } else {
+                indicator.textContent = '⏳ Tour de l\'adversaire';
+                indicator.className = 'status-message waiting';
+            }
+        }
+
+        // Mettre à jour l'historique des coups
+        function updateMoveHistory() {
+            const historyDiv = document.getElementById('moveHistory');
+            
+            if (moveHistory.length === 0) {
+                historyDiv.innerHTML = '<p style="text-align: center; color: #999;">Aucun coup joué</p>';
+                return;
+            }
+
+            historyDiv.innerHTML = moveHistory.map((move, index) => {
+                const moveNumber = Math.floor(index / 2) + 1;
+                const isWhiteMove = index % 2 === 0;
+                return `<div class="move-item">${isWhiteMove ? moveNumber + '.' : ''} ${move}</div>`;
+            }).join('');
+
+            historyDiv.scrollTop = historyDiv.scrollHeight;
+        }
+
+        // Abandonner
+        function resign() {
+            if (!currentGame) {
+                return;
+            }
+
+            if (confirm('Voulez-vous vraiment abandonner cette partie ?')) {
+                socket.emit('resign', { game_id: currentGame.game_id });
+            }
+        }
+
+        // Proposer une nulle
+        function offerDraw() {
+            if (!currentGame) {
+                return;
+            }
+
+            socket.emit('offer_draw', { game_id: currentGame.game_id });
+            alert('Proposition de nulle envoyée à votre adversaire');
+        }
+
+        // Afficher le modal de fin de partie
+        function showGameOver(result, info) {
+            const modal = document.getElementById('gameOverModal');
+            const title = document.getElementById('gameOverTitle');
+            const message = document.getElementById('gameOverMessage');
+
+            let titleText = 'Partie terminée';
+            let messageText = '';
+
+            if (result === 'checkmate' || result === 'white_win' || result === 'black_win') {
+                const winner = info.winner || (result === 'white_win' ? 'Les blancs' : 'Les noirs');
+                titleText = info.winner === currentUser.username ? '🎉 Victoire !' : '😔 Défaite';
+                messageText = `${winner} ont gagné par échec et mat !`;
+            } else if (result === 'stalemate' || result === 'draw') {
+                titleText = '🤝 Partie nulle';
+                messageText = 'La partie se termine par une nulle.';
+            } else if (result === 'resignation') {
+                titleText = info.winner === currentUser.username ? '🎉 Victoire !' : '😔 Défaite';
+                messageText = 'Victoire par abandon';
+            }
+
+            title.textContent = titleText;
+            message.textContent = messageText;
+            modal.classList.add('show');
+
+            // Réinitialiser après 3 secondes
+            setTimeout(() => {
+                resetGame();
+            }, 3000);
+        }
+
+        // Fermer le modal de fin de partie
+        function closeGameOverModal() {
+            document.getElementById('gameOverModal').classList.remove('show');
+            resetGame();
+        }
+
+        // Réinitialiser le jeu
+        function resetGame() {
+            currentGame = null;
+            playerColor = null;
+            selectedSquare = null;
+            moveHistory = [];
+
+            document.getElementById('opponentInfo').style.display = 'none';
+            document.getElementById('playerInfo').style.display = 'none';
+            document.getElementById('turnIndicator').style.display = 'none';
+            document.getElementById('gameControls').style.display = 'none';
+            document.getElementById('queueBtn').disabled = false;
+
+            clearHighlights();
+            updateStatus('Choisissez une action pour commencer', 'waiting');
+            
+            loadPosition(currentFen);
+        }
+
+        // Mettre à jour le statut
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${type}`;
+        }
+
+        // Déconnexion
+        async function handleLogout() {
+            if (currentGame) {
+                alert('Vous ne pouvez pas vous déconnecter pendant une partie !');
+                return;
+            }
+
+            try {
+                await setPlayerOffline();
+                
+                const response = await fetch(`${API_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.clear();
+                    window.location.href = 'auth.html';
+                } else {
+                    alert('Erreur de déconnexion: ' + data.error);
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                alert('Erreur de connexion au serveur');
+            }
+        }
+    </script>
+</body>
+</html>
