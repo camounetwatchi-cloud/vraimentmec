@@ -1160,16 +1160,55 @@
                 loadChallenges();
             });
 
-            socket.on('challenge_accepted', (data) => {
-                console.log('✅ Défi accepté:', data);
-                if (currentUser && (data.challenger_id === currentUser.id || data.accepter_id === currentUser.id)) {
-                    // Le joueur est impliqué dans ce défi
-                    currentGame = { game_id: data.game_id };
-                    loadPosition(data.fen);
-                    updateStatus('🎮 Défi accepté ! La partie commence...', 'playing');
-                }
-                loadChallenges();
-            });
+// Dans game.html, remplacez l'événement socket 'challenge_accepted' par celui-ci :
+
+socket.on('challenge_accepted', (data) => {
+    console.log('✅ Défi accepté:', data);
+    
+    // Vérifier si le joueur actuel est impliqué dans ce défi
+    if (currentUser && (data.challenger_id === currentUser.id || data.accepter_id === currentUser.id)) {
+        console.log('🎮 Vous êtes impliqué dans ce défi !');
+        
+        // Déterminer la couleur du joueur (aléatoire)
+        const isChallenger = data.challenger_id === currentUser.id;
+        const colors = ['white', 'black'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        
+        // Si on est le challenger, on a la couleur random, sinon l'opposé
+        playerColor = isChallenger ? randomColor : (randomColor === 'white' ? 'black' : 'white');
+        
+        // Configurer la partie
+        currentGame = { 
+            game_id: data.game_id,
+            challenge_id: data.challenge_id
+        };
+        
+        loadPosition(data.fen);
+        
+        // Afficher les infos de l'adversaire
+        const opponentName = isChallenger ? data.accepter_name : data.challenger_name;
+        document.getElementById('opponentName').textContent = opponentName;
+        document.getElementById('opponentInfo').style.display = 'flex';
+        document.getElementById('playerInfo').style.display = 'flex';
+        document.getElementById('turnIndicator').style.display = 'block';
+        document.getElementById('gameControls').style.display = 'flex';
+        
+        // Désactiver les boutons de recherche/défi
+        document.getElementById('queueBtn').disabled = true;
+        document.getElementById('createChallengeBtn').disabled = true;
+        
+        document.getElementById('playerColor').textContent = playerColor === 'white' ? '⚪' : '⚫';
+        document.getElementById('opponentColor').textContent = playerColor === 'white' ? '⚫' : '⚪';
+        
+        updateStatus(`🎮 Partie contre ${opponentName} commencée !`, 'playing');
+        updateTurnIndicator(data.fen);
+        
+        console.log(`✅ Partie configurée - Vous jouez: ${playerColor}`);
+    }
+    
+    // Rafraîchir la liste des défis pour tous les joueurs
+    loadChallenges();
+});
 
             socket.on('player_online', (data) => {
                 console.log('✅ Joueur en ligne:', data.username);
