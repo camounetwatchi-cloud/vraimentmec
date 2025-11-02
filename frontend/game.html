@@ -20,7 +20,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
 
@@ -76,7 +76,7 @@
 
         .game-container {
             display: grid;
-            grid-template-columns: 1fr 600px 1fr;
+            grid-template-columns: 300px 1fr 300px;
             gap: 20px;
             align-items: start;
         }
@@ -216,26 +216,35 @@
             color: #333;
         }
 
-        .queue-btn {
+        .action-btn {
             width: 100%;
-            padding: 18px;
+            padding: 15px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             border-radius: 12px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s;
+            margin-bottom: 10px;
         }
 
-        .queue-btn:hover {
+        .action-btn:hover {
             transform: translateY(-2px);
         }
 
-        .queue-btn:disabled {
+        .action-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+        }
+
+        .action-btn.secondary {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        }
+
+        .action-btn.danger {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
         }
 
         .game-controls {
@@ -273,11 +282,12 @@
         }
 
         .move-history {
-            max-height: 300px;
+            max-height: 200px;
             overflow-y: auto;
             background: #f8f9fa;
             border-radius: 8px;
             padding: 15px;
+            margin-top: 15px;
         }
 
         .move-item {
@@ -317,10 +327,10 @@
             border: 3px solid #f3f3f3;
             border-top: 3px solid #667eea;
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
+            width: 20px;
+            height: 20px;
             animation: spin 1s linear infinite;
-            margin: 20px auto;
+            margin: 10px auto;
         }
 
         @keyframes spin {
@@ -382,7 +392,119 @@
             background: #5568d3;
         }
 
-        @media (max-width: 1200px) {
+        /* Nouvelles sections */
+        .challenges-list, .players-list {
+            max-height: 250px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .challenge-item, .player-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .challenge-item:hover, .player-item:hover {
+            background: #e9ecef;
+        }
+
+        .challenge-info, .player-info-item {
+            flex: 1;
+        }
+
+        .challenge-player {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .challenge-time {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .accept-btn {
+            padding: 8px 16px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .accept-btn:hover {
+            background: #45a049;
+        }
+
+        .player-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .player-status.online {
+            background: #4caf50;
+        }
+
+        .player-status.in-game {
+            background: #ff9800;
+        }
+
+        .challenge-btn {
+            padding: 6px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .challenge-btn:hover {
+            background: #5568d3;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-style: italic;
+        }
+
+        .position-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .position-info-title {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .position-info-fen {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #555;
+            word-break: break-all;
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 1400px) {
             .game-container {
                 grid-template-columns: 1fr;
             }
@@ -410,16 +532,24 @@
 
         <!-- Game Container -->
         <div class="game-container">
-            <!-- Left Panel: Game Info -->
+            <!-- Left Panel: Actions & Défis -->
             <div class="side-panel">
-                <h2>Informations</h2>
+                <h2>Actions</h2>
                 
                 <div id="statusMessage" class="status-message waiting">
-                    Cliquez sur "Chercher une partie" pour commencer
+                    Choisissez une action pour commencer
                 </div>
 
-                <button id="queueBtn" class="queue-btn" onclick="joinQueue()">
-                    🎲 Chercher une partie
+                <button id="queueBtn" class="action-btn" onclick="joinQueue()">
+                    🎲 Partie rapide
+                </button>
+
+                <button id="reloadPositionBtn" class="action-btn secondary" onclick="reloadPosition()">
+                    🔄 Nouvelle position
+                </button>
+
+                <button id="createChallengeBtn" class="action-btn secondary" onclick="createChallenge()">
+                    ⚔️ Créer un défi
                 </button>
 
                 <div id="gameControls" class="game-controls" style="display: none;">
@@ -430,17 +560,28 @@
                 <div class="stats-grid">
                     <div class="stat-item">
                         <div class="stat-value" id="gamesPlayed">0</div>
-                        <div class="stat-label">Parties jouées</div>
+                        <div class="stat-label">Parties</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="gamesWon">0</div>
                         <div class="stat-label">Victoires</div>
                     </div>
                 </div>
+
+                <h2 style="margin-top: 20px;">Défis disponibles</h2>
+                <div class="challenges-list" id="challengesList">
+                    <div class="empty-state">Aucun défi pour le moment</div>
+                </div>
             </div>
 
             <!-- Center: Chessboard -->
             <div class="board-container">
+                <!-- Position Info -->
+                <div class="position-info">
+                    <div class="position-info-title">Position actuelle:</div>
+                    <div class="position-info-fen" id="currentFen">2b5/4pQ2/pkp2b1p/6p1/3p4/6n1/3KR1r1/8 w - - 0 24</div>
+                </div>
+
                 <!-- Opponent Info -->
                 <div id="opponentInfo" class="player-info" style="display: none;">
                     <div>
@@ -466,13 +607,18 @@
                     </div>
                     <div class="player-elo" id="playerColor">⚪</div>
                 </div>
-            </div>
 
-            <!-- Right Panel: Move History -->
-            <div class="side-panel">
-                <h2>Historique des coups</h2>
+                <!-- Move History -->
                 <div class="move-history" id="moveHistory">
                     <p style="text-align: center; color: #999;">Aucun coup joué</p>
+                </div>
+            </div>
+
+            <!-- Right Panel: Joueurs connectés -->
+            <div class="side-panel">
+                <h2>Joueurs connectés (<span id="onlineCount">0</span>)</h2>
+                <div class="players-list" id="playersList">
+                    <div class="loader"></div>
                 </div>
             </div>
         </div>
@@ -507,6 +653,7 @@
         let legalMoves = [];
         let currentBoard = null;
         let moveHistory = [];
+        let currentFen = '2b5/4pQ2/pkp2b1p/6p1/3p4/6n1/3KR1r1/8 w - - 0 24';
 
         // Unicode chess pieces
         const PIECES = {
@@ -517,8 +664,12 @@
         // Initialisation
         window.addEventListener('load', async () => {
             await checkAuthentication();
-            initializeBoard();
+            loadPosition(currentFen);
             connectWebSocket();
+            loadOnlinePlayers();
+            loadChallenges();
+            setInterval(loadOnlinePlayers, 5000);
+            setInterval(loadChallenges, 3000);
         });
 
         // Vérifier l'authentification
@@ -546,6 +697,182 @@
             } catch (error) {
                 console.error('❌ Erreur:', error);
                 window.location.href = 'auth.html';
+            }
+        }
+
+        // Recharger une nouvelle position
+        async function reloadPosition() {
+            const btn = document.getElementById('reloadPositionBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Génération...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        target_min: 25,
+                        target_max: 100,
+                        max_attempts: 5000
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentFen = data.data.fen;
+                    document.getElementById('currentFen').textContent = currentFen;
+                    loadPosition(currentFen);
+                    updateStatus('✅ Nouvelle position chargée !', 'playing');
+                } else {
+                    updateStatus('❌ Erreur de génération', 'waiting');
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                updateStatus('❌ Erreur de connexion', 'waiting');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Nouvelle position';
+            }
+        }
+
+        // Charger la liste des joueurs connectés
+        async function loadOnlinePlayers() {
+            try {
+                const response = await fetch(`${API_URL}/api/players/online`, {
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('onlineCount').textContent = data.players.length;
+                    displayOnlinePlayers(data.players);
+                }
+            } catch (error) {
+                console.error('❌ Erreur chargement joueurs:', error);
+            }
+        }
+
+        // Afficher la liste des joueurs
+        function displayOnlinePlayers(players) {
+            const listDiv = document.getElementById('playersList');
+            
+            if (players.length === 0) {
+                listDiv.innerHTML = '<div class="empty-state">Aucun joueur en ligne</div>';
+                return;
+            }
+
+            listDiv.innerHTML = players.map(player => `
+                <div class="player-item">
+                    <div class="player-info-item">
+                        <span class="player-status ${player.in_game ? 'in-game' : 'online'}"></span>
+                        <strong>${player.username}</strong>
+                        <br>
+                        <small>ELO: ${player.elo}</small>
+                    </div>
+                    ${player.id !== currentUser.id && !player.in_game ? 
+                        `<button class="challenge-btn" onclick="challengePlayer('${player.id}', '${player.username}')">Défier</button>` 
+                        : ''}
+                </div>
+            `).join('');
+        }
+
+        // Charger la liste des défis
+        async function loadChallenges() {
+            try {
+                const response = await fetch(`${API_URL}/api/challenges`, {
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayChallenges(data.challenges);
+                }
+            } catch (error) {
+                console.error('❌ Erreur chargement défis:', error);
+            }
+        }
+
+        // Afficher la liste des défis
+        function displayChallenges(challenges) {
+            const listDiv = document.getElementById('challengesList');
+            
+            if (challenges.length === 0) {
+                listDiv.innerHTML = '<div class="empty-state">Aucun défi pour le moment</div>';
+                return;
+            }
+
+            listDiv.innerHTML = challenges.map(challenge => `
+                <div class="challenge-item">
+                    <div class="challenge-info">
+                        <div class="challenge-player">${challenge.challenger_name}</div>
+                        <div class="challenge-time">ELO: ${challenge.challenger_elo}</div>
+                    </div>
+                    ${challenge.challenger_id !== currentUser.id ? 
+                        `<button class="accept-btn" onclick="acceptChallenge('${challenge.id}')">Accepter</button>` 
+                        : '<small style="color: #999;">Votre défi</small>'}
+                </div>
+            `).join('');
+        }
+
+        // Créer un défi
+        async function createChallenge() {
+            try {
+                const response = await fetch(`${API_URL}/api/challenges/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        fen: currentFen
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStatus('✅ Défi créé ! En attente d\'un adversaire...', 'waiting');
+                    loadChallenges();
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                alert('Erreur de connexion');
+            }
+        }
+
+        // Défier un joueur
+        function challengePlayer(playerId, playerName) {
+            if (confirm(`Défier ${playerName} avec la position actuelle ?`)) {
+                createChallenge();
+            }
+        }
+
+        // Accepter un défi
+        async function acceptChallenge(challengeId) {
+            try {
+                const response = await fetch(`${API_URL}/api/challenges/${challengeId}/accept`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStatus('✅ Défi accepté ! Démarrage de la partie...', 'playing');
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                alert('Erreur de connexion');
             }
         }
 
@@ -624,314 +951,4 @@
 
             socket.on('disconnect', () => {
                 console.log('❌ WebSocket déconnecté');
-                updateStatus('Connexion perdue...', 'waiting');
-            });
-        }
-
-        // Rejoindre la file d'attente
-        function joinQueue() {
-            if (!currentUser) {
-                alert('Vous devez être connecté');
-                return;
-            }
-
-            socket.emit('join_queue', {
-                user_id: currentUser.id,
-                username: currentUser.username,
-                elo: currentUser.elo
-            });
-        }
-
-        // Démarrer une partie
-        function startGame(data) {
-            currentGame = data;
-            playerColor = data.color;
-            moveHistory = [];
-            
-            // Afficher les infos de la partie
-            document.getElementById('opponentInfo').style.display = 'flex';
-            document.getElementById('playerInfo').style.display = 'flex';
-            document.getElementById('gameControls').style.display = 'flex';
-            document.getElementById('turnIndicator').style.display = 'block';
-            
-            document.getElementById('opponentName').textContent = data.opponent.username;
-            document.getElementById('playerName').textContent = currentUser.username;
-            
-            // Couleurs
-            document.getElementById('playerColor').textContent = playerColor === 'white' ? '⚪' : '⚫';
-            document.getElementById('opponentColor').textContent = playerColor === 'white' ? '⚫' : '⚪';
-            
-            // Charger la position
-            loadPosition(data.fen);
-            
-            // Mise à jour du statut
-            const isMyTurn = (playerColor === 'white' && data.game_info.turn === 'white') ||
-                            (playerColor === 'black' && data.game_info.turn === 'black');
-            updateTurnIndicator(isMyTurn);
-            
-            updateStatus('Partie en cours !', 'playing');
-            
-            document.getElementById('queueBtn').style.display = 'none';
-        }
-
-        // Charger une position FEN
-        function loadPosition(fen) {
-            currentBoard = parseFEN(fen);
-            renderBoard();
-        }
-
-        // Parser FEN
-        function parseFEN(fen) {
-            const board = Array(8).fill(null).map(() => Array(8).fill(null));
-            const rows = fen.split(' ')[0].split('/');
-            
-            for (let i = 0; i < 8; i++) {
-                let col = 0;
-                for (let char of rows[i]) {
-                    if (isNaN(char)) {
-                        board[i][col] = char;
-                        col++;
-                    } else {
-                        col += parseInt(char);
-                    }
-                }
-            }
-            
-            return board;
-        }
-
-        // Initialiser l'échiquier
-        function initializeBoard() {
-            const chessboard = document.getElementById('chessboard');
-            chessboard.innerHTML = '';
-            
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    const square = document.createElement('div');
-                    square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
-                    square.dataset.row = row;
-                    square.dataset.col = col;
-                    square.onclick = () => handleSquareClick(row, col);
-                    chessboard.appendChild(square);
-                }
-            }
-        }
-
-        // Rendre l'échiquier
-        function renderBoard() {
-            const squares = document.querySelectorAll('.square');
-            
-            squares.forEach(square => {
-                const row = parseInt(square.dataset.row);
-                const col = parseInt(square.dataset.col);
-                
-                // Inverser l'affichage si on joue noir
-                const displayRow = playerColor === 'black' ? 7 - row : row;
-                const displayCol = playerColor === 'black' ? 7 - col : col;
-                
-                const piece = currentBoard[displayRow][displayCol];
-                square.textContent = piece ? PIECES[piece] : '';
-                
-                // Réinitialiser les classes
-                square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
-            });
-        }
-
-        // Gérer le clic sur une case
-        function handleSquareClick(row, col) {
-            if (!currentGame) return;
-            
-            // Inverser les coordonnées si on joue noir
-            const boardRow = playerColor === 'black' ? 7 - row : row;
-            const boardCol = playerColor === 'black' ? 7 - col : col;
-            
-            const piece = currentBoard[boardRow][boardCol];
-            
-            // Si une pièce est sélectionnée
-            if (selectedSquare) {
-                // Tentative de déplacement
-                const from = indexToSquare(selectedSquare.row, selectedSquare.col);
-                const to = indexToSquare(boardRow, boardCol);
-                const move = from + to;
-                
-                makeMove(move);
-                
-                // Désélectionner
-                selectedSquare = null;
-                renderBoard();
-            } else if (piece && isMyPiece(piece)) {
-                // Sélectionner une pièce
-                selectedSquare = { row: boardRow, col: boardCol };
-                highlightSquare(row, col);
-            }
-        }
-
-        // Vérifier si c'est ma pièce
-        function isMyPiece(piece) {
-            const isWhite = piece === piece.toUpperCase();
-            return (playerColor === 'white' && isWhite) || (playerColor === 'black' && !isWhite);
-        }
-
-        // Convertir index en notation d'échecs
-        function indexToSquare(row, col) {
-            const files = 'abcdefgh';
-            const ranks = '87654321';
-            return files[col] + ranks[row];
-        }
-
-        // Surligner une case
-        function highlightSquare(row, col) {
-            const squares = document.querySelectorAll('.square');
-            squares.forEach(sq => {
-                if (sq.dataset.row == row && sq.dataset.col == col) {
-                    sq.classList.add('selected');
-                }
-            });
-        }
-
-        // Faire un coup
-        function makeMove(move) {
-            if (!currentGame) return;
-            
-            socket.emit('make_move', {
-                game_id: currentGame.game_id,
-                move: move
-            });
-        }
-
-        // Gérer un coup effectué
-        function handleMoveMade(data) {
-            loadPosition(data.fen);
-            
-            // Ajouter à l'historique
-            moveHistory.push(data.move);
-            updateMoveHistory();
-            
-            // Mise à jour du tour
-            const fenParts = data.fen.split(' ');
-            const turn = fenParts[1];
-            const isMyTurn = (playerColor === 'white' && turn === 'w') ||
-                            (playerColor === 'black' && turn === 'b');
-            updateTurnIndicator(isMyTurn);
-            
-            // Vérifier si la partie est terminée
-            if (data.status !== 'running' && data.status !== 'check') {
-                handleGameOver({ result: data.info.result, reason: data.status });
-            }
-        }
-
-        // Mettre à jour l'indicateur de tour
-        function updateTurnIndicator(isMyTurn) {
-            const indicator = document.getElementById('turnIndicator');
-            if (isMyTurn) {
-                indicator.textContent = '🟢 À votre tour de jouer';
-                indicator.className = 'status-message your-turn';
-            } else {
-                indicator.textContent = '⏳ Tour de l\'adversaire';
-                indicator.className = 'status-message waiting';
-            }
-        }
-
-        // Mettre à jour l'historique des coups
-        function updateMoveHistory() {
-            const historyDiv = document.getElementById('moveHistory');
-            historyDiv.innerHTML = '';
-            
-            for (let i = 0; i < moveHistory.length; i += 2) {
-                const moveNum = Math.floor(i / 2) + 1;
-                const whiteMove = moveHistory[i];
-                const blackMove = moveHistory[i + 1] || '';
-                
-                const moveItem = document.createElement('div');
-                moveItem.className = 'move-item';
-                moveItem.textContent = `${moveNum}. ${whiteMove} ${blackMove}`;
-                historyDiv.appendChild(moveItem);
-            }
-            
-            historyDiv.scrollTop = historyDiv.scrollHeight;
-        }
-
-        // Gérer la fin de partie
-        function handleGameOver(data) {
-            const modal = document.getElementById('gameOverModal');
-            const title = document.getElementById('gameOverTitle');
-            const message = document.getElementById('gameOverMessage');
-            
-            let resultText = '';
-            
-            if (data.result === 'white_win') {
-                resultText = playerColor === 'white' ? '🎉 Vous avez gagné !' : '😢 Vous avez perdu';
-            } else if (data.result === 'black_win') {
-                resultText = playerColor === 'black' ? '🎉 Vous avez gagné !' : '😢 Vous avez perdu';
-            } else if (data.result === 'draw') {
-                resultText = '🤝 Partie nulle';
-            }
-            
-            title.textContent = resultText;
-            message.textContent = `Raison: ${data.reason || 'Fin de partie'}`;
-            
-            modal.classList.add('show');
-            
-            // Recharger les stats
-            setTimeout(() => {
-                checkAuthentication();
-            }, 1000);
-        }
-
-        // Fermer le modal
-        function closeGameOverModal() {
-            document.getElementById('gameOverModal').classList.remove('show');
-            resetGame();
-        }
-
-        // Réinitialiser la partie
-        function resetGame() {
-            currentGame = null;
-            playerColor = null;
-            selectedSquare = null;
-            moveHistory = [];
-            
-            document.getElementById('opponentInfo').style.display = 'none';
-            document.getElementById('playerInfo').style.display = 'none';
-            document.getElementById('gameControls').style.display = 'none';
-            document.getElementById('turnIndicator').style.display = 'none';
-            document.getElementById('queueBtn').style.display = 'block';
-            document.getElementById('queueBtn').textContent = '🎲 Chercher une partie';
-            document.getElementById('queueBtn').disabled = false;
-            
-            updateStatus('Cliquez sur "Chercher une partie" pour commencer', 'waiting');
-            
-            initializeBoard();
-        }
-
-        // Abandonner
-        function resign() {
-            if (!currentGame) return;
-            
-            if (confirm('Êtes-vous sûr de vouloir abandonner ?')) {
-                socket.emit('resign', {
-                    game_id: currentGame.game_id
-                });
-            }
-        }
-
-        // Proposer une nulle
-        function offerDraw() {
-            if (!currentGame) return;
-            
-            socket.emit('offer_draw', {
-                game_id: currentGame.game_id
-            });
-            
-            alert('Proposition de nulle envoyée à votre adversaire');
-        }
-
-        // Mettre à jour le statut
-        function updateStatus(text, type) {
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.textContent = text;
-            statusDiv.className = `status-message ${type}`;
-        }
-    </script>
-</body>
-</html>
+                updateStatus('Connexion perdue
