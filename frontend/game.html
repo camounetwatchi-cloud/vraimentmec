@@ -393,19 +393,20 @@
         }
 
         .challenges-list, .players-list {
-            max-height: 250px;
+            max-height: 200px;
             overflow-y: auto;
             margin-top: 10px;
         }
 
         .challenge-item, .player-item {
             background: #f8f9fa;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 8px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin-bottom: 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 0.9em;
         }
 
         .challenge-item:hover, .player-item:hover {
@@ -815,21 +816,32 @@
             }
         }
 
-        // Charger la liste des joueurs connectés (simulation temporaire)
+        // Charger la liste des joueurs connectés (VRAIS joueurs)
         async function loadOnlinePlayers() {
             try {
-                // Pour l'instant, on simule les données car l'endpoint n'existe pas encore
-                const mockPlayers = [
-                    { id: '1', username: 'Joueur1', elo: 1450, in_game: false },
-                    { id: '2', username: 'Joueur2', elo: 1380, in_game: true },
-                    { id: '3', username: 'Joueur3', elo: 1520, in_game: false }
-                ].filter(p => currentUser && p.id !== currentUser.id);
+                const response = await fetch(`${API_URL}/api/players/online`, {
+                    credentials: 'include'
+                });
 
-                document.getElementById('onlineCount').textContent = mockPlayers.length + 1;
-                displayOnlinePlayers(mockPlayers);
+                if (!response.ok) {
+                    throw new Error('Erreur réseau');
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Filtrer pour ne pas afficher l'utilisateur actuel
+                    const otherPlayers = data.players.filter(p => currentUser && p.id !== currentUser.id);
+                    
+                    document.getElementById('onlineCount').textContent = data.count;
+                    displayOnlinePlayers(otherPlayers);
+                } else {
+                    throw new Error(data.error || 'Erreur inconnue');
+                }
             } catch (error) {
                 console.error('❌ Erreur chargement joueurs:', error);
                 document.getElementById('playersList').innerHTML = '<div class="empty-state">Erreur de chargement</div>';
+                document.getElementById('onlineCount').textContent = '0';
             }
         }
 
