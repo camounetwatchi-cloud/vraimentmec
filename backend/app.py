@@ -418,12 +418,8 @@ def internal_error(error):
     return jsonify({'error': 'Erreur interne du serveur'}), 500
 
 # ========================================
-# DÉMARRAGE DE L'APPLICATION
+# ENDPOINTS POUR JOUEURS EN LIGNE
 # ========================================
-
-# Ajoutez ces endpoints dans backend/app.py après les routes existantes
-
-# Ajoutez ces endpoints dans backend/app.py après les routes existantes
 
 @app.route('/api/players/online', methods=['GET'])
 def get_online_players():
@@ -495,12 +491,12 @@ def set_player_online():
         
         print(f"✅ {user.username} est maintenant en ligne")
         
-        # Notifier les autres joueurs via WebSocket
+        # Notifier les autres joueurs via WebSocket (CORRIGÉ : sans broadcast=True)
         socketio.emit('player_online', {
             'user_id': user.id,
             'username': user.username,
             'elo': user.elo_rating
-        }, broadcast=True)
+        })
         
         return jsonify({
             'success': True,
@@ -541,11 +537,11 @@ def set_player_offline():
         
         print(f"✅ {user.username} est maintenant hors ligne")
         
-        # Notifier les autres joueurs via WebSocket
+        # Notifier les autres joueurs via WebSocket (CORRIGÉ : sans broadcast=True)
         socketio.emit('player_offline', {
             'user_id': user.id,
             'username': user.username
-        }, broadcast=True)
+        })
         
         return jsonify({
             'success': True,
@@ -559,6 +555,10 @@ def set_player_offline():
             'error': 'Erreur serveur'
         }), 500
 
+
+# ========================================
+# ENDPOINTS POUR LES DÉFIS
+# ========================================
 
 # Structure pour stocker les défis
 challenges = {}
@@ -642,12 +642,12 @@ def create_challenge():
         
         print(f"✅ Défi créé: {challenge_id} par {user.username}")
         
-        # Notifier tous les joueurs via WebSocket
+        # Notifier tous les joueurs via WebSocket (CORRIGÉ : sans broadcast=True)
         socketio.emit('new_challenge', {
             'challenge_id': challenge_id,
             'challenger_name': user.username,
             'challenger_elo': user.elo_rating
-        }, broadcast=True)
+        })
         
         return jsonify({
             'success': True,
@@ -662,8 +662,6 @@ def create_challenge():
             'error': 'Erreur serveur'
         }), 500
 
-
-# Dans backend/app.py, remplacez la fonction accept_challenge par celle-ci :
 
 @app.route('/api/challenges/<challenge_id>/accept', methods=['POST'])
 def accept_challenge(challenge_id):
@@ -707,10 +705,6 @@ def accept_challenge(challenge_id):
         import uuid
         game_id = str(uuid.uuid4())
         
-        # Stocker les informations du défi accepté pour que les clients WebSocket puissent les récupérer
-        # On ne crée PAS la partie ici car on n'a pas les vrais SID WebSocket
-        # La partie sera créée via WebSocket quand les deux joueurs se connecteront
-        
         print(f"✅ Défi accepté: {challenge_id}")
         print(f"   Challenger: {challenger.username}")
         print(f"   Accepteur: {user.username}")
@@ -719,7 +713,7 @@ def accept_challenge(challenge_id):
         # Supprimer le défi de la liste
         del challenges[challenge_id]
         
-        # Notifier les deux joueurs via WebSocket
+        # Notifier les deux joueurs via WebSocket (CORRIGÉ : sans broadcast=True)
         socketio.emit('challenge_accepted', {
             'challenge_id': challenge_id,
             'game_id': game_id,
@@ -728,7 +722,7 @@ def accept_challenge(challenge_id):
             'challenger_name': challenger.username,
             'accepter_name': user.username,
             'fen': challenge['fen']
-        }, broadcast=True)
+        })
         
         return jsonify({
             'success': True,
@@ -779,10 +773,10 @@ def cancel_challenge(challenge_id):
         
         print(f"✅ Défi annulé: {challenge_id}")
         
-        # Notifier tous les joueurs
+        # Notifier tous les joueurs (CORRIGÉ : sans broadcast=True)
         socketio.emit('challenge_cancelled', {
             'challenge_id': challenge_id
-        }, broadcast=True)
+        })
         
         return jsonify({
             'success': True,
@@ -795,3 +789,11 @@ def cancel_challenge(challenge_id):
             'success': False,
             'error': 'Erreur serveur'
         }), 500
+
+
+# ========================================
+# DÉMARRAGE DE L'APPLICATION
+# ========================================
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
