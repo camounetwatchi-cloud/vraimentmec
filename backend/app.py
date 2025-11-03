@@ -32,7 +32,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 # Configuration de la session
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'votre-cle-secrete-super-securisee-changez-moi')
-app.config['SESSION_COOKIE_SECURE'] = False  # True en production HTTPS uniquement
+app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
@@ -45,7 +45,6 @@ is_production = os.environ.get('FLASK_ENV') == 'production'
 
 print(f"🔧 Mode: {'Production' if is_production else 'Développement'}")
 
-# Configuration CORS simple et permissive pour le développement
 CORS(app, 
      resources={r"/*": {"origins": "*"}},
      supports_credentials=True,
@@ -56,15 +55,12 @@ CORS(app,
 # INITIALISATION
 # ========================================
 
-# Initialiser la base de données
 init_db(app)
 
-# Déterminer le mode async approprié
 async_mode = 'gevent' if is_production else 'threading'
 
 print(f"🔧 Mode async: {async_mode}")
 
-# Initialiser SocketIO
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
@@ -76,7 +72,6 @@ socketio = SocketIO(
     manage_session=False
 )
 
-# Créer les tables au démarrage
 try:
     with app.app_context():
         create_tables(app)
@@ -91,29 +86,24 @@ except Exception as e:
 @app.route('/auth')
 @app.route('/auth.html')
 def serve_auth():
-    """Sert la page d'authentification"""
     return send_from_directory('../frontend', 'auth.html')
 
 @app.route('/game')
 @app.route('/game.html')
 def serve_game():
-    """Sert la page de jeu"""
     return send_from_directory('../frontend', 'game.html')
 
 @app.route('/index.html')
 @app.route('/home')
 def serve_index():
-    """Sert la page d'accueil"""
     return send_from_directory('../frontend', 'index.html')
 
 @app.route('/style.css')
 def serve_css():
-    """Sert le CSS"""
     return send_from_directory('../frontend', 'style.css')
 
 @app.route('/script.js')
 def serve_js():
-    """Sert le JavaScript"""
     return send_from_directory('../frontend', 'script.js')
 
 # ========================================
@@ -128,7 +118,6 @@ app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 @app.route('/')
 def home():
-    """Page d'accueil de l'API"""
     return jsonify({
         'message': 'Bienvenue sur l\'API Chess Generator',
         'version': '1.0.0',
@@ -149,7 +138,6 @@ def home():
 
 @app.route('/api/health')
 def health_check():
-    """Endpoint de santé pour vérifier que l'API fonctionne"""
     try:
         return jsonify({
             'status': 'healthy',
@@ -167,7 +155,6 @@ def health_check():
 
 @app.route('/api/generate', methods=['POST', 'OPTIONS'])
 def generate_position():
-    """Endpoint pour générer une position FEN d'échecs"""
     if request.method == 'OPTIONS':
         return '', 204
         
@@ -178,7 +165,6 @@ def generate_position():
         target_max = data.get('target_max', 100)
         max_attempts = data.get('max_attempts', 20000)
         
-        # Validation des paramètres
         if target_min >= target_max:
             return jsonify({
                 'success': False,
@@ -191,7 +177,6 @@ def generate_position():
                 'error': 'max_attempts doit être entre 1000 et 50000'
             }), 400
         
-        # Générer la position
         result = generate_fen_position(target_min, target_max, max_attempts)
         
         return jsonify({
@@ -212,13 +197,11 @@ def generate_position():
 
 @socketio.on('connect')
 def handle_connect():
-    """Gère la connexion d'un client WebSocket"""
     print(f"✅ Client connecté: {request.sid}")
     emit('connection_established', {'sid': request.sid, 'async_mode': socketio.async_mode})
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Gère la déconnexion d'un client WebSocket"""
     print(f"❌ Client déconnecté: {request.sid}")
     
     MatchmakingManager.remove_player(request.sid)
@@ -235,59 +218,8 @@ def handle_disconnect():
         
         MatchmakingManager.handle_player_disconnect(request.sid, game_id)
 
-@socketio.on('join_queue')
-def handle_join_queue(data):
-    """Gère l'ajout d'un joueur à la file d'attente"""
-    try:
-        user_id = data.get('user_id')
-        username = data.get('username', 'Joueur')
-        elo = data.get('elo', 1200)
-        
-        if not user_id:
-            emit('error', {'message': 'user_id requis'})
-            return
-        
-        MatchmakingManager.add_player(request.sid, user_id, username, elo)
-        
-        emit('queue_joined', {
-            'message': 'Vous êtes dans la file d\'attente',
-            'waiting_players': MatchmakingManager.get_waiting_players_count()
-        })
-        
-        game_id = MatchmakingManager.check_for_match(request.sid)
-        
-        if game_id:
-            game = games[game_id]
-            
-            for player_sid in game.players.keys():
-                player_color = game.get_player_color(player_sid)
-                opponent_sid = game.get_opponent_id(player_sid)
-                opponent_info = game.get_player_info(opponent_sid)
-                
-                emit('game_start', {
-                    'game_id': game_id,
-                    'color': player_color,
-                    'fen': game.fen,
-                    'opponent': {
-                        'username': opponent_info['username'],
-                        'user_id': opponent_info['user_id']
-                    },
-                    'game_info': game.get_game_info()
-                }, room=player_sid)
-        
-    except Exception as e:
-        print(f"❌ Erreur dans join_queue: {e}")
-        emit('error', {'message': 'Erreur lors de l\'ajout à la file d\'attente'})
-
-@socketio.on('leave_queue')
-def handle_leave_queue():
-    """Gère le retrait d'un joueur de la file d'attente"""
-    MatchmakingManager.remove_player(request.sid)
-    emit('queue_left', {'message': 'Vous avez quitté la file d\'attente'})
-
 @socketio.on('make_move')
 def handle_make_move(data):
-    """Gère un mouvement d'échecs"""
     try:
         game_id = data.get('game_id')
         move = data.get('move')
@@ -323,7 +255,6 @@ def handle_make_move(data):
 
 @socketio.on('resign')
 def handle_resign(data):
-    """Gère l'abandon d'une partie"""
     try:
         game_id = data.get('game_id')
         
@@ -354,7 +285,6 @@ def handle_resign(data):
 
 @socketio.on('offer_draw')
 def handle_offer_draw(data):
-    """Gère une proposition de nulle"""
     try:
         game_id = data.get('game_id')
         
@@ -378,7 +308,6 @@ def handle_offer_draw(data):
 
 @socketio.on('accept_draw')
 def handle_accept_draw(data):
-    """Gère l'acceptation d'une nulle"""
     try:
         game_id = data.get('game_id')
         
@@ -423,16 +352,13 @@ def internal_error(error):
 
 @app.route('/api/players/online', methods=['GET'])
 def get_online_players():
-    """Récupère la liste des joueurs connectés"""
     try:
         from backend.db_models import User
         
-        # Récupérer tous les joueurs en ligne
         online_players = User.query.filter_by(is_online=True).all()
         
         players_list = []
         for player in online_players:
-            # Vérifier si le joueur est dans une partie active
             in_game = False
             for game_id, game in games.items():
                 if any(p['user_id'] == player.id for p in game.players.values()):
@@ -464,7 +390,6 @@ def get_online_players():
 
 @app.route('/api/players/set-online', methods=['POST'])
 def set_player_online():
-    """Marque le joueur comme en ligne"""
     try:
         user_id = session.get('user_id')
         
@@ -484,14 +409,12 @@ def set_player_online():
                 'error': 'Utilisateur introuvable'
             }), 404
         
-        # Mettre à jour le statut
         user.is_online = True
         user.last_login = datetime.utcnow()
         db.session.commit()
         
         print(f"✅ {user.username} est maintenant en ligne")
         
-        # Notifier les autres joueurs via WebSocket (CORRIGÉ : sans broadcast=True)
         socketio.emit('player_online', {
             'user_id': user.id,
             'username': user.username,
@@ -513,7 +436,6 @@ def set_player_online():
 
 @app.route('/api/players/set-offline', methods=['POST'])
 def set_player_offline():
-    """Marque le joueur comme hors ligne"""
     try:
         user_id = session.get('user_id')
         
@@ -537,7 +459,6 @@ def set_player_offline():
         
         print(f"✅ {user.username} est maintenant hors ligne")
         
-        # Notifier les autres joueurs via WebSocket (CORRIGÉ : sans broadcast=True)
         socketio.emit('player_offline', {
             'user_id': user.id,
             'username': user.username
@@ -560,16 +481,13 @@ def set_player_offline():
 # ENDPOINTS POUR LES DÉFIS
 # ========================================
 
-# Structure pour stocker les défis
 challenges = {}
 
 @app.route('/api/challenges', methods=['GET'])
 def get_challenges():
-    """Récupère la liste des défis disponibles"""
     try:
         from datetime import datetime, timedelta
         
-        # Nettoyer les défis expirés (plus de 5 minutes)
         now = datetime.utcnow()
         expired = []
         for challenge_id, challenge in challenges.items():
@@ -579,7 +497,6 @@ def get_challenges():
         for challenge_id in expired:
             del challenges[challenge_id]
         
-        # Retourner les défis actifs
         challenges_list = []
         for challenge_id, challenge in challenges.items():
             challenges_list.append({
@@ -588,6 +505,7 @@ def get_challenges():
                 'challenger_name': challenge['challenger_name'],
                 'challenger_elo': challenge['challenger_elo'],
                 'fen': challenge['fen'],
+                'time_control': challenge.get('time_control', {'minutes': 5, 'increment': 0}),
                 'created_at': challenge['created_at'].isoformat()
             })
         
@@ -606,7 +524,6 @@ def get_challenges():
 
 @app.route('/api/challenges/create', methods=['POST'])
 def create_challenge():
-    """Crée un nouveau défi"""
     try:
         user_id = session.get('user_id')
         
@@ -629,24 +546,25 @@ def create_challenge():
         
         data = request.get_json()
         fen = data.get('fen', chess.STARTING_FEN)
+        time_control = data.get('time_control', {'minutes': 5, 'increment': 0})
         
-        # Créer le défi
         challenge_id = str(uuid.uuid4())
         challenges[challenge_id] = {
             'challenger_id': user_id,
             'challenger_name': user.username,
             'challenger_elo': user.elo_rating,
             'fen': fen,
+            'time_control': time_control,
             'created_at': datetime.utcnow()
         }
         
-        print(f"✅ Défi créé: {challenge_id} par {user.username}")
+        print(f"✅ Défi créé: {challenge_id} par {user.username} ({time_control['minutes']}+{time_control['increment']})")
         
-        # Notifier tous les joueurs via WebSocket (CORRIGÉ : sans broadcast=True)
         socketio.emit('new_challenge', {
             'challenge_id': challenge_id,
             'challenger_name': user.username,
-            'challenger_elo': user.elo_rating
+            'challenger_elo': user.elo_rating,
+            'time_control': time_control
         })
         
         return jsonify({
@@ -665,7 +583,6 @@ def create_challenge():
 
 @app.route('/api/challenges/<challenge_id>/accept', methods=['POST'])
 def accept_challenge(challenge_id):
-    """Accepte un défi et notifie les joueurs"""
     try:
         user_id = session.get('user_id')
         
@@ -683,7 +600,6 @@ def accept_challenge(challenge_id):
         
         challenge = challenges[challenge_id]
         
-        # Vérifier qu'on n'accepte pas son propre défi
         if challenge['challenger_id'] == user_id:
             return jsonify({
                 'success': False,
@@ -701,19 +617,16 @@ def accept_challenge(challenge_id):
                 'error': 'Utilisateur introuvable'
             }), 404
         
-        # Générer un game_id unique
         import uuid
         game_id = str(uuid.uuid4())
         
         print(f"✅ Défi accepté: {challenge_id}")
         print(f"   Challenger: {challenger.username}")
         print(f"   Accepteur: {user.username}")
-        print(f"   FEN: {challenge['fen']}")
+        print(f"   Cadence: {challenge['time_control']['minutes']}+{challenge['time_control']['increment']}")
         
-        # Supprimer le défi de la liste
         del challenges[challenge_id]
         
-        # Notifier les deux joueurs via WebSocket (CORRIGÉ : sans broadcast=True)
         socketio.emit('challenge_accepted', {
             'challenge_id': challenge_id,
             'game_id': game_id,
@@ -721,7 +634,8 @@ def accept_challenge(challenge_id):
             'accepter_id': user_id,
             'challenger_name': challenger.username,
             'accepter_name': user.username,
-            'fen': challenge['fen']
+            'fen': challenge['fen'],
+            'time_control': challenge['time_control']
         })
         
         return jsonify({
@@ -743,7 +657,6 @@ def accept_challenge(challenge_id):
 
 @app.route('/api/challenges/<challenge_id>/cancel', methods=['DELETE'])
 def cancel_challenge(challenge_id):
-    """Annule un défi"""
     try:
         user_id = session.get('user_id')
         
@@ -761,19 +674,16 @@ def cancel_challenge(challenge_id):
         
         challenge = challenges[challenge_id]
         
-        # Vérifier que c'est bien le créateur du défi
         if challenge['challenger_id'] != user_id:
             return jsonify({
                 'success': False,
                 'error': 'Vous ne pouvez annuler que vos propres défis'
             }), 403
         
-        # Supprimer le défi
         del challenges[challenge_id]
         
         print(f"✅ Défi annulé: {challenge_id}")
         
-        # Notifier tous les joueurs (CORRIGÉ : sans broadcast=True)
         socketio.emit('challenge_cancelled', {
             'challenge_id': challenge_id
         })
