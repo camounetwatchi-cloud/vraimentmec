@@ -1065,41 +1065,37 @@
             updateStatus('Position réinitialisée', 'playing');
         }
 
-        async function reloadPosition() {
-            const btn = document.getElementById('reloadPositionBtn');
-            btn.disabled = true;
-            btn.textContent = '⏳ Génération...';
+// MODIFIEZ LA FONCTION reloadPosition() dans game.html
 
-            try {
-                const response = await fetch(`${API_URL}/api/generate`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        target_min: 25,
-                        target_max: 100,
-                        max_attempts: 5000
-                    })
-                });
+async function reloadPosition() {
+    const btn = document.getElementById('reloadPositionBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Chargement...';
 
-                const data = await response.json();
+    try {
+        // MODIFICATION ICI: Utilise /api/random-position au lieu de /api/generate
+        const response = await fetch(`${API_URL}/api/random-position`, {
+            method: 'GET',
+            credentials: 'include'
+        });
 
-                if (data.success) {
-                    loadPosition(data.data.fen);
-                    updateStatus('✅ Nouvelle position chargée !', 'playing');
-                } else {
-                    updateStatus('❌ Erreur de génération', 'waiting');
-                }
-            } catch (error) {
-                console.error('❌ Erreur:', error);
-                updateStatus('❌ Erreur de connexion', 'waiting');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '🔄 Nouvelle position';
-            }
+        const data = await response.json();
+
+        if (data.success) {
+            loadPosition(data.data.fen);
+            updateStatus('✅ Nouvelle position chargée depuis le cache !', 'playing');
+            console.log('📊 Position:', data.data);
+        } else {
+            updateStatus('❌ ' + data.error, 'waiting');
         }
+    } catch (error) {
+        console.error('❌ Erreur:', error);
+        updateStatus('❌ Erreur de connexion', 'waiting');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Nouvelle position';
+    }
+}
 
         async function loadOnlinePlayers() {
             try {
