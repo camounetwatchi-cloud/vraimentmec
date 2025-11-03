@@ -2,7 +2,10 @@ from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
+import json
+import random
 from datetime import timedelta, datetime
+from pathlib import Path
 import chess
 
 # Importer les modules du backend
@@ -38,7 +41,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # ========================================
-# CONFIGURATION CORS - SIMPLIFIÉE ET FONCTIONNELLE
+# CONFIGURATION CORS
 # ========================================
 
 is_production = os.environ.get('FLASK_ENV') == 'production'
@@ -79,6 +82,28 @@ try:
 except Exception as e:
     print(f"⚠️ Avertissement lors de la création des tables: {e}")
 
+# Charger les positions depuis le fichier JSON
+POSITIONS_FILE = Path(__file__).parent / 'positions.json'
+CACHED_POSITIONS = []
+
+def load_positions():
+    """Charge les positions depuis le fichier JSON"""
+    global CACHED_POSITIONS
+    try:
+        if POSITIONS_FILE.exists():
+            with open(POSITIONS_FILE, 'r', encoding='utf-8') as f:
+                CACHED_POSITIONS = json.load(f)
+                print(f"✅ {len(CACHED_POSITIONS)} positions chargées depuis positions.json")
+        else:
+            print("⚠️ Fichier positions.json introuvable")
+            CACHED_POSITIONS = []
+    except Exception as e:
+        print(f"❌ Erreur chargement positions.json: {e}")
+        CACHED_POSITIONS = []
+
+# Charger les positions au démarrage
+load_positions()
+
 # ========================================
 # ROUTES POUR SERVIR LES FICHIERS FRONTEND
 # ========================================
@@ -93,8 +118,14 @@ def serve_auth():
 def serve_game():
     return send_from_directory('../frontend', 'game.html')
 
+@app.route('/generator')
+@app.route('/generator.html')
+def serve_generator():
+    return send_from_directory('../frontend', 'generator.html')
+
 @app.route('/index.html')
 @app.route('/home')
+@app.route('/')
 def serve_index():
     return send_from_directory('../frontend', 'index.html')
 
@@ -124,13 +155,16 @@ def home():
         'status': 'running',
         'mode': 'production' if is_production else 'development',
         'async_mode': socketio.async_mode,
+        'cached_positions': len(CACHED_POSITIONS),
         'endpoints': {
             'auth': '/api/auth/*',
             'generate': '/api/generate',
+            'random_position': '/api/random-position',
             'health': '/api/health',
             'frontend': {
                 'auth': '/auth',
                 'game': '/game',
+                'generator': '/generator',
                 'home': '/home'
             }
         }
@@ -145,6 +179,7 @@ def health_check():
             'active_games': MatchmakingManager.get_active_games_count(),
             'waiting_players': MatchmakingManager.get_waiting_players_count(),
             'async_mode': socketio.async_mode,
+            'cached_positions': len(CACHED_POSITIONS),
             'timestamp': datetime.utcnow().isoformat()
         })
     except Exception as e:
@@ -153,8 +188,37 @@ def health_check():
             'error': str(e)
         }), 500
 
+@app.route('/api/random-position', methods=['GET', 'OPTIONS'])
+def get_random_position():
+    """Retourne une position aléatoire depuis le fichier JSON"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        if not CACHED_POSITIONS:
+            return jsonify({
+                'success': False,
+                'error': 'Aucune position disponible dans le cache'
+            }), 404
+        
+        # Sélectionner une position aléatoire
+        position = random.choice(CACHED_POSITIONS)
+        
+        return jsonify({
+            'success': True,
+            'data': position
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur lors de la récupération d'une position aléatoire: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/generate', methods=['POST', 'OPTIONS'])
 def generate_position():
+    """Génère une nouvelle position avec Stockfish (pour la page generator)"""
     if request.method == 'OPTIONS':
         return '', 204
         
@@ -186,6 +250,26 @@ def generate_position():
         
     except Exception as e:
         print(f"❌ Erreur lors de la génération: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/reload-positions', methods=['POST', 'OPTIONS'])
+def reload_positions():
+    """Recharge les positions depuis le fichier JSON"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        load_positions()
+        return jsonify({
+            'success': True,
+            'message': f'{len(CACHED_POSITIONS)} positions rechargées',
+            'count': len(CACHED_POSITIONS)
+        })
+    except Exception as e:
+        print(f"❌ Erreur lors du rechargement: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -387,7 +471,6 @@ def get_online_players():
             'error': 'Erreur serveur'
         }), 500
 
-
 @app.route('/api/players/set-online', methods=['POST'])
 def set_player_online():
     try:
@@ -433,7 +516,6 @@ def set_player_online():
             'error': 'Erreur serveur'
         }), 500
 
-
 @app.route('/api/players/set-offline', methods=['POST'])
 def set_player_offline():
     try:
@@ -475,7 +557,6 @@ def set_player_offline():
             'success': False,
             'error': 'Erreur serveur'
         }), 500
-
 
 # ========================================
 # ENDPOINTS POUR LES DÉFIS
@@ -520,7 +601,6 @@ def get_challenges():
             'success': False,
             'error': 'Erreur serveur'
         }), 500
-
 
 @app.route('/api/challenges/create', methods=['POST'])
 def create_challenge():
@@ -579,7 +659,6 @@ def create_challenge():
             'success': False,
             'error': 'Erreur serveur'
         }), 500
-
 
 @app.route('/api/challenges/<challenge_id>/accept', methods=['POST'])
 def accept_challenge(challenge_id):
@@ -654,7 +733,6 @@ def accept_challenge(challenge_id):
             'error': 'Erreur serveur'
         }), 500
 
-
 @app.route('/api/challenges/<challenge_id>/cancel', methods=['DELETE'])
 def cancel_challenge(challenge_id):
     try:
@@ -699,7 +777,6 @@ def cancel_challenge(challenge_id):
             'success': False,
             'error': 'Erreur serveur'
         }), 500
-
 
 # ========================================
 # DÉMARRAGE DE L'APPLICATION
