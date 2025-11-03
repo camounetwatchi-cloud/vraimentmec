@@ -1142,33 +1142,7 @@
             }
         }
 
-        // Vérifier l'authentification
-        async function checkAuthentication() {
-            try {
-                const response = await fetch(`${API_URL}/api/auth/me`, {
-                    credentials: 'include'
-                });
-                
-                const data = await response.json();
-                
-                if (!data.success) {
-                    console.log('❌ Non authentifié, redirection...');
-                    window.location.href = 'auth.html';
-                    return;
-                }
-                
-                currentUser = data.user;
-                document.getElementById('username').textContent = currentUser.username;
-                document.getElementById('userElo').textContent = `ELO: ${currentUser.elo}`;
-                document.getElementById('gamesPlayed').textContent = currentUser.games_played;
-                document.getElementById('gamesWon').textContent = currentUser.games_won;
-                
-                console.log('✅ Utilisateur connecté:', currentUser.username);
-            } catch (error) {
-                console.error('❌ Erreur:', error);
-                window.location.href = 'auth.html';
-            }
-        }
+       
 
         async function setPlayerOnline() {
             try {
