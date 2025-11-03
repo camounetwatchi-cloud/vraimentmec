@@ -6,8 +6,6 @@
     <title>Jeu d'Échecs en Ligne</title>
     <style>
         * {
-
-            * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -21,7 +19,7 @@
             color: #333;
         }
 
-        /* NOUVEAU NAVBAR UNIFIÉ */
+        /* NAVBAR UNIFIÉE */
         .navbar {
             background: white;
             border-radius: 15px;
@@ -161,73 +159,9 @@
             }
         }
 
-            
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #333;
-        }
-
         .container {
             max-width: 1600px;
             margin: 0 auto;
-        }
-
-        .header {
-            background: white;
-            border-radius: 15px;
-            padding: 20px 30px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header h1 {
-            color: #667eea;
-            font-size: 1.8em;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .user-name {
-            font-weight: 600;
-            color: #555;
-        }
-
-        .user-elo {
-            background: #667eea;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-        }
-
-        .logout-btn {
-            background: #f44336;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background 0.3s;
-        }
-
-        .logout-btn:hover {
-            background: #d32f2f;
         }
 
         .game-container {
@@ -684,7 +618,6 @@
             color: #2e7d32;
         }
 
-        /* Styles pour le modal de création de défi */
         .time-control-group {
             margin: 20px 0;
             text-align: left;
@@ -784,16 +717,17 @@
     </style>
 </head>
 <body>
+    <!-- NAVBAR UNIFIÉE -->
     <div class="navbar">
         <a href="index.html" class="navbar-brand">
             ♟️ Échecs en Ligne
         </a>
         
         <div class="navbar-center">
-            <a href="game.html" class="navbar-link active" id="nav-game">
+            <a href="game.html" class="navbar-link active">
                 🎮 Jouer
             </a>
-            <a href="generator.html" class="navbar-link" id="nav-generator">
+            <a href="generator.html" class="navbar-link">
                 🎲 Générateur
             </a>
         </div>
@@ -814,6 +748,7 @@
         </div>
     </div>
 
+    <div class="container">
         <!-- Game Container -->
         <div class="game-container">
             <!-- Left Panel: Actions & Défis -->
@@ -1000,7 +935,7 @@
         };
 
         window.addEventListener('load', async () => {
-            await checkNavAuthentication();  // NOUVEAU: pour le navbar
+            await checkNavAuthentication();
             initializeBoard();
             loadPosition(currentFen);
             connectWebSocket();
@@ -1035,9 +970,7 @@
             document.getElementById('timeIncrement').value = increment;
         }
 
-
-
-         async function checkNavAuthentication() {
+        async function checkNavAuthentication() {
             try {
                 const response = await fetch(`${API_URL}/api/auth/me`, {
                     credentials: 'include'
@@ -1047,12 +980,16 @@
                 
                 if (data.success) {
                     navUser = data.user;
+                    currentUser = data.user;
                     document.getElementById('navUserInfo').style.display = 'flex';
                     document.getElementById('navLogoutBtn').style.display = 'inline-block';
                     document.getElementById('navLoginBtn').style.display = 'none';
                     
                     document.getElementById('navUsername').textContent = navUser.username;
                     document.getElementById('navElo').textContent = `ELO: ${navUser.elo}`;
+                    
+                    document.getElementById('gamesPlayed').textContent = navUser.games_played || 0;
+                    document.getElementById('gamesWon').textContent = navUser.games_won || 0;
                 } else {
                     document.getElementById('navUserInfo').style.display = 'none';
                     document.getElementById('navLogoutBtn').style.display = 'none';
@@ -1065,7 +1002,6 @@
             }
         }
 
-        // NOUVEAU: Déconnexion depuis le navbar
         async function handleNavLogout() {
             if (currentGame) {
                 alert('Vous ne pouvez pas vous déconnecter pendant une partie !');
@@ -1141,8 +1077,6 @@
             }
         }
 
-       
-
         async function setPlayerOnline() {
             try {
                 const response = await fetch(`${API_URL}/api/players/set-online`, {
@@ -1177,7 +1111,6 @@
             }
         }
 
-        // Initialiser l'échiquier
         function initializeBoard() {
             const chessboard = document.getElementById('chessboard');
             chessboard.innerHTML = '';
@@ -1196,7 +1129,6 @@
             console.log('✅ Échiquier initialisé');
         }
 
-        // Charger une position FEN
         function loadPosition(fen) {
             console.log('📋 Chargement FEN:', fen);
             currentFen = fen;
@@ -1214,7 +1146,6 @@
             }
         }
 
-        // Rendre l'échiquier
         function renderBoard() {
             const squares = document.querySelectorAll('.square');
             const boardArray = chessGame.board();
@@ -1277,37 +1208,34 @@
             updateStatus('Position réinitialisée', 'playing');
         }
 
-// MODIFIEZ LA FONCTION reloadPosition() dans game.html
+        async function reloadPosition() {
+            const btn = document.getElementById('reloadPositionBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Chargement...';
 
-async function reloadPosition() {
-    const btn = document.getElementById('reloadPositionBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Chargement...';
+            try {
+                const response = await fetch(`${API_URL}/api/random-position`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
 
-    try {
-        // MODIFICATION ICI: Utilise /api/random-position au lieu de /api/generate
-        const response = await fetch(`${API_URL}/api/random-position`, {
-            method: 'GET',
-            credentials: 'include'
-        });
+                const data = await response.json();
 
-        const data = await response.json();
-
-        if (data.success) {
-            loadPosition(data.data.fen);
-            updateStatus('✅ Nouvelle position chargée depuis le cache !', 'playing');
-            console.log('📊 Position:', data.data);
-        } else {
-            updateStatus('❌ ' + data.error, 'waiting');
+                if (data.success) {
+                    loadPosition(data.data.fen);
+                    updateStatus('✅ Nouvelle position chargée depuis le cache !', 'playing');
+                    console.log('📊 Position:', data.data);
+                } else {
+                    updateStatus('❌ ' + data.error, 'waiting');
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                updateStatus('❌ Erreur de connexion', 'waiting');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Nouvelle position';
+            }
         }
-    } catch (error) {
-        console.error('❌ Erreur:', error);
-        updateStatus('❌ Erreur de connexion', 'waiting');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '🔄 Nouvelle position';
-    }
-}
 
         async function loadOnlinePlayers() {
             try {
@@ -1849,34 +1777,6 @@ async function reloadPosition() {
             const statusDiv = document.getElementById('statusMessage');
             statusDiv.textContent = message;
             statusDiv.className = `status-message ${type}`;
-        }
-
-        async function handleLogout() {
-            if (currentGame) {
-                alert('Vous ne pouvez pas vous déconnecter pendant une partie !');
-                return;
-            }
-
-            try {
-                await setPlayerOffline();
-                
-                const response = await fetch(`${API_URL}/api/auth/logout`, {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    localStorage.clear();
-                    window.location.href = 'auth.html';
-                } else {
-                    alert('Erreur de déconnexion: ' + data.error);
-                }
-            } catch (error) {
-                console.error('❌ Erreur:', error);
-                alert('Erreur de connexion au serveur');
-            }
         }
     </script>
 </body>
