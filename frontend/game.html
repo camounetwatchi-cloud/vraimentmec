@@ -999,9 +999,9 @@
             'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
         };
 
-        // Initialisation
         window.addEventListener('load', async () => {
-            await checkAuthentication();
+            await checkAuthentication();  // Votre fonction existante
+            await checkNavAuthentication();  // NOUVEAU: pour le navbar
             initializeBoard();
             loadPosition(currentFen);
             connectWebSocket();
