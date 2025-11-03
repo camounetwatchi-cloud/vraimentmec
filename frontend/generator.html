@@ -301,15 +301,6 @@
             background: #6fa03c;
         }
 
-        .save-btn {
-            background: #ff9800;
-            color: white;
-        }
-
-        .save-btn:hover {
-            background: #f57c00;
-        }
-
         footer {
             background: #f8f9fa;
             padding: 20px;
@@ -350,7 +341,7 @@
     <div class="container">
         <header>
             <h1>🎲 Générateur de Positions</h1>
-            <p class="subtitle">Génération de positions d'échecs avec déséquilibre matériel contrôlé</p>
+            <p class="subtitle">Génération de positions d'échecs avec Stockfish et déséquilibre matériel</p>
         </header>
 
         <main>
@@ -358,7 +349,7 @@
                 <h3>⚡ Comment ça marche ?</h3>
                 <p>
                     Ce générateur utilise Stockfish pour créer des positions d'échecs équilibrées avec un léger déséquilibre matériel. 
-                    Les positions générées sont sauvegardées et peuvent être utilisées directement dans vos parties.
+                    La génération peut prendre jusqu'à 2 minutes selon les paramètres.
                 </p>
             </div>
 
@@ -439,9 +430,6 @@
                         <a id="chesscomLink" href="#" target="_blank" class="action-btn chesscom-btn">
                             🔍 Voir sur Chess.com
                         </a>
-                        <button class="action-btn save-btn" onclick="savePosition()">
-                            💾 Sauvegarder
-                        </button>
                     </div>
                 </div>
             </div>
@@ -466,8 +454,6 @@
         const statusDiv = document.getElementById('status');
         const resultsDiv = document.getElementById('results');
 
-        let currentPosition = null;
-
         // Gestionnaire du bouton de génération
         generateBtn.addEventListener('click', async () => {
             const targetMin = parseInt(document.getElementById('targetMin').value);
@@ -485,10 +471,10 @@
             btnText.style.display = 'none';
             btnLoader.style.display = 'inline-block';
             resultsDiv.classList.add('hidden');
-            showStatus('Génération en cours... Cela peut prendre jusqu\'à 2 minutes.', 'info');
+            showStatus('⏳ Génération en cours avec Stockfish... Cela peut prendre jusqu\'à 2 minutes.', 'info');
 
             try {
-                const response = await fetch(`${API_URL}/generate-new`, {
+                const response = await fetch(`${API_URL}/generate`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -503,9 +489,8 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    currentPosition = result.data;
                     displayResults(result.data);
-                    showStatus('✅ Position générée avec succès !', 'success');
+                    showStatus('✅ Position générée avec succès par Stockfish !', 'success');
                 } else {
                     showStatus(`❌ Erreur: ${result.error}`, 'error');
                 }
@@ -559,35 +544,6 @@
             }).catch(err => {
                 alert('Erreur lors de la copie: ' + err);
             });
-        }
-
-        // Sauvegarder la position
-        async function savePosition() {
-            if (!currentPosition) {
-                alert('Aucune position à sauvegarder');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_URL}/save-position`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify(currentPosition)
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showStatus('✅ Position sauvegardée avec succès !', 'success');
-                } else {
-                    showStatus(`❌ Erreur: ${result.error}`, 'error');
-                }
-            } catch (error) {
-                showStatus(`❌ Erreur de connexion: ${error.message}`, 'error');
-            }
         }
     </script>
 </body>
