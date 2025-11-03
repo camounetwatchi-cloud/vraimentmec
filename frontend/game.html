@@ -6,6 +6,162 @@
     <title>Jeu d'Échecs en Ligne</title>
     <style>
         * {
+
+            * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        /* NOUVEAU NAVBAR UNIFIÉ */
+        .navbar {
+            background: white;
+            border-radius: 15px;
+            padding: 15px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .navbar-brand {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .navbar-brand:hover {
+            color: #5568d3;
+        }
+
+        .navbar-center {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .navbar-link {
+            color: #555;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .navbar-link:hover {
+            background: #f0f0f0;
+            color: #667eea;
+        }
+
+        .navbar-link.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .nav-user-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .nav-user-elo {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .nav-login-btn, .nav-logout-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .nav-login-btn:hover, .nav-logout-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .nav-logout-btn {
+            background: #f44336;
+        }
+
+        .nav-logout-btn:hover {
+            background: #d32f2f;
+        }
+
+        /* Responsive navbar */
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .navbar-center {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .navbar-link {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .navbar-right {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .nav-user-info {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+            
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -628,16 +784,35 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>♟️ Échecs en Ligne</h1>
-            <div class="user-info">
-                <span class="user-name" id="username">Chargement...</span>
-                <span class="user-elo" id="userElo">ELO: 1200</span>
-                <button class="logout-btn" onclick="handleLogout()">Déconnexion</button>
-            </div>
+    <div class="navbar">
+        <a href="index.html" class="navbar-brand">
+            ♟️ Échecs en Ligne
+        </a>
+        
+        <div class="navbar-center">
+            <a href="game.html" class="navbar-link active" id="nav-game">
+                🎮 Jouer
+            </a>
+            <a href="generator.html" class="navbar-link" id="nav-generator">
+                🎲 Générateur
+            </a>
         </div>
+
+        <div class="navbar-right">
+            <div class="nav-user-info" id="navUserInfo" style="display: none;">
+                <span class="nav-user-name" id="navUsername">Joueur</span>
+                <span class="nav-user-elo" id="navElo">ELO: 1200</span>
+            </div>
+
+            <a href="auth.html" class="nav-login-btn" id="navLoginBtn" style="display: none;">
+                🔐 Connexion
+            </a>
+
+            <button class="nav-logout-btn" id="navLogoutBtn" style="display: none;" onclick="handleNavLogout()">
+                🚪 Déconnexion
+            </button>
+        </div>
+    </div>
 
         <!-- Game Container -->
         <div class="game-container">
@@ -813,6 +988,7 @@
         let currentFen = '2b5/4pQ2/pkp2b1p/6p1/3p4/6n1/3KR1r1/8 w - - 0 24';
         let savedFen = currentFen;
         let gameMode = 'analysis';
+        let navUser = null;
 
         // Instance Chess.js pour la logique locale
         let chessGame = new Chess(currentFen);
@@ -858,6 +1034,69 @@
         function setTimeControl(minutes, increment) {
             document.getElementById('timeMinutes').value = minutes;
             document.getElementById('timeIncrement').value = increment;
+        }
+
+
+
+         async function checkNavAuthentication() {
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me`, {
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    navUser = data.user;
+                    document.getElementById('navUserInfo').style.display = 'flex';
+                    document.getElementById('navLogoutBtn').style.display = 'inline-block';
+                    document.getElementById('navLoginBtn').style.display = 'none';
+                    
+                    document.getElementById('navUsername').textContent = navUser.username;
+                    document.getElementById('navElo').textContent = `ELO: ${navUser.elo}`;
+                } else {
+                    document.getElementById('navUserInfo').style.display = 'none';
+                    document.getElementById('navLogoutBtn').style.display = 'none';
+                    document.getElementById('navLoginBtn').style.display = 'inline-block';
+                }
+            } catch (error) {
+                document.getElementById('navUserInfo').style.display = 'none';
+                document.getElementById('navLogoutBtn').style.display = 'none';
+                document.getElementById('navLoginBtn').style.display = 'inline-block';
+            }
+        }
+
+        // NOUVEAU: Déconnexion depuis le navbar
+        async function handleNavLogout() {
+            if (currentGame) {
+                alert('Vous ne pouvez pas vous déconnecter pendant une partie !');
+                return;
+            }
+
+            if (!confirm('Voulez-vous vraiment vous déconnecter ?')) {
+                return;
+            }
+
+            try {
+                await setPlayerOffline();
+                
+                const response = await fetch(`${API_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.clear();
+                    window.location.href = 'auth.html';
+                } else {
+                    alert('Erreur de déconnexion: ' + data.error);
+                }
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                alert('Erreur de connexion au serveur');
+            }
         }
 
         async function confirmCreateChallenge() {
