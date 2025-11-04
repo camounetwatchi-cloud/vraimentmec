@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+    <link rel="stylesheet" href="navbar.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Générateur de Positions - Échecs</title>
@@ -287,13 +288,34 @@
     </style>
 </head>
 <body>
-    <!-- Navigation Bar -->
+   <!-- Navigation Bar -->
     <div class="navbar">
-        <div class="navbar-brand">♟️ Échecs</div>
-        <div class="navbar-menu">
-            <a href="game.html" class="navbar-link">Jouer</a>
-            <a href="generator.html" class="navbar-link active">Générateur</a>
-            <a href="auth.html" class="navbar-link">Connexion</a>
+        <a href="index.html" class="navbar-brand">
+            ♟️ Échecs en Ligne
+        </a>
+        
+        <div class="navbar-center">
+            <a href="game.html" class="navbar-link">
+                🎮 Jouer
+            </a>
+            <a href="generator.html" class="navbar-link active">
+                🎲 Générateur
+            </a>
+        </div>
+
+        <div class="navbar-right">
+            <div class="nav-user-info" id="navUserInfo" style="display: none;">
+                <span class="nav-user-name" id="navUsername">Joueur</span>
+                <span class="nav-user-elo" id="navElo">ELO: 1200</span>
+            </div>
+
+            <a href="auth.html" class="nav-login-btn" id="navLoginBtn" style="display: none;">
+                🔐 Connexion
+            </a>
+
+            <button class="nav-logout-btn" id="navLogoutBtn" style="display: none;" onclick="handleNavLogout()">
+                🚪 Déconnexion
+            </button>
         </div>
     </div>
 
