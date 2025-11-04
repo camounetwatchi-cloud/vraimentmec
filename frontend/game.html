@@ -769,13 +769,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 
     <script>
-        // Configuration de l'API
-        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? 'http://localhost:5000'
-            : 'http://chessishard-env-env.eba-f8bxehfn.eu-west-1.elasticbeanstalk.com';
-
-        console.log('🔧 API URL:', API_URL);
-
         // Variables globales
         let socket = null;
         let currentUser = null;
