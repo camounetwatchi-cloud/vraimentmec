@@ -3,104 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Générateur FEN d'Échecs</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Accueil - Échecs en ligne</title>
+    <link rel="stylesheet" href="navbar.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+
+        .hero h1 {
+            font-size: 3em;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .hero p {
+            font-size: 1.3em;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .cta-btn {
+            padding: 18px 40px;
+            font-size: 1.2em;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .cta-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .cta-btn.primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .cta-btn.secondary {
+            background: white;
+            color: #667eea;
+            border: 3px solid #667eea;
+        }
+
+        .cta-btn.secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: white;
+            font-size: 0.9em;
+        }
+    </style>
 </head>
 <body>
+    <!-- Navigation Bar -->
+    <div class="navbar">
+        <a href="index.html" class="navbar-brand">
+            ♟️ Échecs en Ligne
+        </a>
+        
+        <div class="navbar-center">
+            <a href="game.html" class="navbar-link">
+                🎮 Jouer
+            </a>
+            <a href="generator.html" class="navbar-link">
+                🎲 Générateur
+            </a>
+        </div>
+
+        <div class="navbar-right">
+            <div class="nav-user-info" id="navUserInfo" style="display: none;">
+                <span class="nav-user-name" id="navUsername">Joueur</span>
+                <span class="nav-user-elo" id="navElo">ELO: 1200</span>
+            </div>
+
+            <a href="auth.html" class="nav-login-btn" id="navLoginBtn" style="display: none;">
+                🔐 Connexion
+            </a>
+
+            <button class="nav-logout-btn" id="navLogoutBtn" style="display: none;" onclick="handleNavLogout()">
+                🚪 Déconnexion
+            </button>
+        </div>
+    </div>
+
     <div class="container">
-        <header>
-            <h1>♟️ Générateur FEN d'Échecs</h1>
-            <p class="subtitle">Génération de positions d'échecs avec déséquilibre matériel contrôlé</p>
-        </header>
+        <!-- Hero Section -->
+        <div class="hero">
+            <h1>♟️ Bienvenue aux Échecs en Ligne</h1>
+            <p>Affrontez des adversaires du monde entier sur des positions générées par Stockfish</p>
+            
+            <div class="cta-buttons">
+                <a href="game.html" class="cta-btn primary">🎮 Commencer à jouer</a>
+                <a href="auth.html" class="cta-btn secondary">🔐 Se connecter</a>
+            </div>
+        </div>
 
-        <main>
-            <div class="controls-section">
-                <h2>Paramètres</h2>
-                <div class="controls">
-                    <div class="control-group">
-                        <label for="targetMin">Évaluation min (centipawns):</label>
-                        <input type="number" id="targetMin" value="25" min="0" max="500">
-                    </div>
-                    <div class="control-group">
-                        <label for="targetMax">Évaluation max (centipawns):</label>
-                        <input type="number" id="targetMax" value="100" min="0" max="500">
-                    </div>
-                    <div class="control-group">
-                        <label for="maxAttempts">Tentatives maximum:</label>
-                        <input type="number" id="maxAttempts" value="20000" min="1000" max="50000" step="1000">
-                    </div>
-                </div>
-                
-                <button id="generateBtn" class="generate-btn">
-                    <span id="btnText">🎲 Générer une position</span>
-                    <span id="btnLoader" class="loader" style="display: none;"></span>
-                </button>
+        <!-- Features -->
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">⚔️</div>
+                <h3>Parties en ligne</h3>
+                <p>Défiez d'autres joueurs en temps réel avec un système de matchmaking intelligent</p>
             </div>
 
-            <div id="status" class="status hidden"></div>
-
-            <div id="results" class="results hidden">
-                <h2>Résultats</h2>
-                <div class="result-card">
-                    <div class="result-item">
-                        <strong>FEN:</strong>
-                        <div class="fen-display">
-                            <code id="fenText"></code>
-                            <button class="copy-btn" onclick="copyFEN()">📋 Copier</button>
-                        </div>
-                    </div>
-                    <div class="result-grid">
-                        <div class="result-item">
-                            <strong>Matériel Blanc:</strong>
-                            <span id="whiteMaterial"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Matériel Noir:</strong>
-                            <span id="blackMaterial"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Différence:</strong>
-                            <span id="materialDiff"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Trait:</strong>
-                            <span id="turn"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Éval Ligne 1:</strong>
-                            <span id="evalLine1"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Éval Ligne 2:</strong>
-                            <span id="evalLine2"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Tentatives:</strong>
-                            <span id="attempts"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Temps:</strong>
-                            <span id="timeSeconds"></span>
-                        </div>
-                    </div>
-                    
-                    <div class="actions">
-                        <a id="lichessLink" href="#" target="_blank" class="action-btn lichess-btn">
-                            📊 Analyser sur Lichess
-                        </a>
-                        <a id="chesscomLink" href="#" target="_blank" class="action-btn chesscom-btn">
-                            🔍 Voir sur Chess.com
-                        </a>
-                    </div>
-                </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎲</div>
+                <h3>Positions générées</h3>
+                <p>Jouez sur des positions équilibrées avec déséquilibre matériel, générées par Stockfish</p>
             </div>
-        </main>
+
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Analyse avancée</h3>
+                <p>Analysez vos parties avec les évaluations de Stockfish et progressez</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🏆</div>
+                <h3>Classement ELO</h3>
+                <p>Gagnez des points et grimpez dans le classement mondial</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">⏱️</div>
+                <h3>Cadences variées</h3>
+                <p>Bullet, Blitz, Rapide ou Classique - choisissez votre tempo</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🎮</div>
+                <h3>Mode Invité</h3>
+                <p>Jouez immédiatement sans créer de compte</p>
+            </div>
+        </div>
 
         <footer>
-            <p>Propulsé par Stockfish • Backend Flask • Python Chess</p>
+            <p>Propulsé par Stockfish • Flask • Socket.IO • Chess.js</p>
+            <p>© 2024 Échecs en Ligne - Tous droits réservés</p>
         </footer>
     </div>
 
-    <script src="script.js"></script>
+    <script src="navbar.js"></script>
 </body>
 </html>
