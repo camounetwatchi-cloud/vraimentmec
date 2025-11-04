@@ -30,19 +30,29 @@ async function initNavbar() {
 
 // Afficher la navbar pour utilisateur connecté
 function showAuthenticatedNavbar(user) {
-    document.getElementById('navUserInfo').style.display = 'flex';
-    document.getElementById('navLogoutBtn').style.display = 'inline-block';
-    document.getElementById('navLoginBtn').style.display = 'none';
+    const navUserInfo = document.getElementById('navUserInfo');
+    const navLogoutBtn = document.getElementById('navLogoutBtn');
+    const navLoginBtn = document.getElementById('navLoginBtn');
+    const navUsername = document.getElementById('navUsername');
+    const navElo = document.getElementById('navElo');
     
-    document.getElementById('navUsername').textContent = user.username;
-    document.getElementById('navElo').textContent = `ELO: ${user.elo}`;
+    if (navUserInfo) navUserInfo.style.display = 'flex';
+    if (navLogoutBtn) navLogoutBtn.style.display = 'inline-block';
+    if (navLoginBtn) navLoginBtn.style.display = 'none';
+    
+    if (navUsername) navUsername.textContent = user.username;
+    if (navElo) navElo.textContent = `ELO: ${user.elo}`;
 }
 
 // Afficher la navbar pour utilisateur non connecté
 function showUnauthenticatedNavbar() {
-    document.getElementById('navUserInfo').style.display = 'none';
-    document.getElementById('navLogoutBtn').style.display = 'none';
-    document.getElementById('navLoginBtn').style.display = 'inline-block';
+    const navUserInfo = document.getElementById('navUserInfo');
+    const navLogoutBtn = document.getElementById('navLogoutBtn');
+    const navLoginBtn = document.getElementById('navLoginBtn');
+    
+    if (navUserInfo) navUserInfo.style.display = 'none';
+    if (navLogoutBtn) navLogoutBtn.style.display = 'none';
+    if (navLoginBtn) navLoginBtn.style.display = 'inline-block';
 }
 
 // Gérer la déconnexion
@@ -84,10 +94,10 @@ function setActiveNavLink() {
     links.forEach(link => {
         link.classList.remove('active');
         const href = link.getAttribute('href');
+        
         if (href === currentPage || 
             (currentPage === '' && href === 'index.html') ||
-            (currentPage === 'game.html' && href === 'game.html') ||
-            (currentPage === 'generator.html' && href === 'generator.html')) {
+            (currentPage === '/' && href === 'index.html')) {
             link.classList.add('active');
         }
     });
