@@ -12,7 +12,7 @@ games = {}
 class Game:
     """Représente une partie d'échecs active avec gestion complète."""
     
-    def __init__(self, player1_sid, player2_sid, player1_user_id, player2_user_id, fen_start):
+    def __init__(self, player1_sid, player2_sid, player1_user_id, player2_user_id, fen_start, time_control=None):
         """
         Initialise une nouvelle partie d'échecs.
         
@@ -28,6 +28,12 @@ class Game:
         self.starting_fen = fen_start
         self.moves_history = []  # Liste des coups en notation UCI
         self.started_at = datetime.now()
+        time_control = fen_start if isinstance(fen_start, dict) else {'minutes': 5, 'increment': 0}
+        self.time_control = time_control or {'minutes': 5, 'increment': 0}
+        self.white_time = time_control.get('minutes', 5) * 60  # en secondes
+        self.black_time = time_control.get('minutes', 5) * 60
+        self.increment = time_control.get('increment', 0)
+        self.last_move_time = datetime.now()
         
         # Importer ici pour éviter les imports circulaires
         from .db_models import User
@@ -192,6 +198,26 @@ class Game:
 
             # Effectuer le mouvement
             self.board.push(move)
+            # Mise à jour du temps
+now = datetime.now()
+elapsed = (now - self.last_move_time).total_seconds()
+
+if player_color == chess.WHITE:
+    self.white_time -= elapsed
+    self.white_time += self.increment
+    if self.white_time <= 0:
+        status = 'timeout'
+        result = 'black_win'
+        winner = self.get_player_info(self.get_opponent_id(player_sid))['username']
+else:
+    self.black_time -= elapsed
+    self.black_time += self.increment
+    if self.black_time <= 0:
+        status = 'timeout'
+        result = 'white_win'
+        winner = self.get_player_info(self.get_opponent_id(player_sid))['username']
+
+self.last_move_time = now
             self.moves_history.append(uci_move)
             
             # Déterminer le statut de la partie
