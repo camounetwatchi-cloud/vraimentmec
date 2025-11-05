@@ -17,6 +17,36 @@
             text-align: center;
         }
 
+        .learn-more-btn {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+    padding: 8px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9em;
+    transition: all 0.3s;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+}
+
+.learn-more-btn:hover {
+    background: #667eea;
+    color: white;
+    transform: translateX(-50%) translateY(-2px);
+    box-shadow: 0 6px 15px rgba(102, 126, 234, 0.3);
+}
+
+header {
+    position: relative;
+    padding-bottom: 40px;
+}
+
         header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
@@ -288,11 +318,31 @@
         }
 
         .info-box {
-            background: #e3f2fd;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
+    background: #e3f2fd;
+    padding: 0;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #667eea;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: all 0.5s ease-in-out;
+}
+
+.info-box.expanded {
+    max-height: 500px;
+    padding: 15px;
+    opacity: 1;
+    margin-top: 20px;
+}
+
+.info-box.collapsed {
+    max-height: 0;
+    padding: 0;
+    opacity: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
         }
 
         .info-box h3 {
@@ -600,23 +650,26 @@
 
     <div class="container">
         <header>
-            <h1>🎲 Random chess FEN generator</h1>
-            <p class="subtitle">No more pattern recognition : Welcome to concrete chess</p>
-        </header>
+    <h1>🎲 Random chess FEN generator</h1>
+    <p class="subtitle">No more pattern recognition : Welcome to concrete chess</p>
+    <button id="learnMoreBtn" class="learn-more-btn">
+        <span id="learnMoreText">Learn more ▼</span>
+    </button>
+</header>
 
         <main>
-    <div class="info-box">
-        <h3>This generator creates playable and (almost) equal positions. Here are the non-modifiable conditions</h3>           
-        <ul style="text-align: left; padding-left: 20px; line-height: 1.8;">
-            <li><strong>At least 2 "equal" lines</strong> To avoid boring lines and perpetuals</li>
-            <li><strong>A maximum disadvantage/advantage of 1 pawn equivalent</strong> To keep it playable</li>
-            <li><strong>Matériel limité :</strong> Maximum 22 points par côté</li>
-            <li><strong>Fous de couleurs opposées :</strong> Chaque camp a au maximum 1 fou sur cases blanches et 1 sur cases noires</li>
-        </ul>
-        <p style="margin-top: 12px; color: #856404;">
-            ⏱️ La génération peut prendre jusqu'à 2 minutes selon le nombre de tentatives.
-        </p>
-    </div>
+    <div id="infoBox" class="info-box collapsed">
+    <h3>This generator creates playable and (almost) equal positions. Here are the non-modifiable conditions</h3>           
+    <ul style="text-align: left; padding-left: 20px; line-height: 1.8;">
+        <li><strong>At least 2 "equal" lines</strong> To avoid boring lines and perpetuals</li>
+        <li><strong>A maximum disadvantage/advantage of 1 pawn equivalent</strong> To keep the thinks playable</li>
+        <li><strong>Matériel limité :</strong> Maximum 22 points par côté</li>
+        <li><strong>Fous de couleurs opposées :</strong> Chaque camp a au maximum 1 fou sur cases blanches et 1 sur cases noires</li>
+    </ul>
+    <p style="margin-top: 12px; color: #856404;">
+        ⏱️ La génération peut prendre jusqu'à 2 minutes selon le nombre de tentatives.
+    </p>
+</div>
 
 <div class="controls">
     <!-- Évaluation Range -->
@@ -755,6 +808,22 @@ let filteredPieces = [];
 
 // Initialiser les événements de filtrage
 document.addEventListener('DOMContentLoaded', () => {
+    // Gestion du bouton Learn More
+const learnMoreBtn = document.getElementById('learnMoreBtn');
+const infoBox = document.getElementById('infoBox');
+const learnMoreText = document.getElementById('learnMoreText');
+
+learnMoreBtn.addEventListener('click', () => {
+    if (infoBox.classList.contains('collapsed')) {
+        infoBox.classList.remove('collapsed');
+        infoBox.classList.add('expanded');
+        learnMoreText.textContent = 'Show less ▲';
+    } else {
+        infoBox.classList.remove('expanded');
+        infoBox.classList.add('collapsed');
+        learnMoreText.textContent = 'Learn more ▼';
+    }
+});
     // Gestion des sliders
 const targetMinSlider = document.getElementById('targetMin');
 const targetMaxSlider = document.getElementById('targetMax');
