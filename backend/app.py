@@ -404,20 +404,24 @@ def handle_join_game(data):
             
             # Envoyer game_start aux deux joueurs
             emit('game_start', {
+                'white_time': game.white_time,
+                'black_time': game.black_time,
+                'time_control': game.time_control
                 'game_id': game_id,
                 'color': game.get_player_color(challenger_sid),
                 'fen': game.fen,
-                'time_control': game_info.get('time_control'),
                 'opponent': {
                     'username': game_info['accepter_name']
                 }
             }, room=challenger_sid)
             
             emit('game_start', {
+                'white_time': game.white_time,
+                'black_time': game.black_time,
+                'time_control': game.time_control
                 'game_id': game_id,
                 'color': game.get_player_color(accepter_sid),
                 'fen': game.fen,
-                'time_control': game_info.get('time_control'),
                 'opponent': {
                     'username': game_info['challenger_name']
                 }
