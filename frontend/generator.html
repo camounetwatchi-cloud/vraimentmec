@@ -286,6 +286,105 @@
             line-height: 1.6;
         }
 
+        /* Ajouter après le style .info-box p */
+
+.filters-container {
+    position: fixed;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+}
+
+.filters-title {
+    font-weight: 600;
+    color: #667eea;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 1.1em;
+}
+
+.pieces-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.piece-filter-item {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    background: #f8f9fa;
+    border: 3px solid #e0e0e0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    user-select: none;
+}
+
+.piece-filter-item:hover {
+    transform: scale(1.1);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.piece-filter-item.filtered {
+    background: #ffebee;
+    border-color: #f44336;
+    opacity: 0.6;
+}
+
+.piece-filter-item.filtered::after {
+    content: '✕';
+    position: absolute;
+    font-size: 30px;
+    color: #f44336;
+    font-weight: bold;
+}
+
+.reset-filters-btn {
+    margin-top: 15px;
+    padding: 8px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85em;
+    transition: all 0.3s;
+    width: 100%;
+}
+
+.reset-filters-btn:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+}
+
+/* Responsive - masquer sur petits écrans */
+@media (max-width: 1200px) {
+    .filters-container {
+        position: static;
+        transform: none;
+        margin-bottom: 20px;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .pieces-filter {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
         /* CSS Échiquier - Ajouter après .info-box p */
 .board-container {
     background: white;
@@ -330,6 +429,34 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
 <body>
+    <!-- Panneau de filtrage des pièces -->
+    <div class="filters-container">
+        <div class="filters-title">🎯 Filtrer les pièces</div>
+        <div class="pieces-filter">
+            <div class="piece-filter-item" data-piece="queen" title="Dame">
+                ♕
+            </div>
+            <div class="piece-filter-item" data-piece="rook" title="Tour">
+                ♖
+            </div>
+            <div class="piece-filter-item" data-piece="bishop" title="Fou">
+                ♗
+            </div>
+            <div class="piece-filter-item" data-piece="knight" title="Cavalier">
+                ♘
+            </div>
+            <div class="piece-filter-item" data-piece="pawn" title="Pion">
+                ♙
+            </div>
+        </div>
+        <button class="reset-filters-btn" onclick="resetFilters()">
+            🔄 Réinitialiser
+        </button>
+    </div>
+
+    <!-- Le reste du contenu existant -->
+    <div class="navbar-wrapper">
+    <!-- ... -->
     <div class="navbar-wrapper">
         <div class="navbar">
         <a href="index.html" class="navbar-brand">
@@ -500,6 +627,47 @@
 <script src="navbar.js"></script>
     <script>
 
+        // Gestion des filtres de pièces
+let filteredPieces = [];
+
+// Initialiser les événements de filtrage
+document.addEventListener('DOMContentLoaded', () => {
+    const pieceItems = document.querySelectorAll('.piece-filter-item');
+    
+    pieceItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const piece = item.dataset.piece;
+            togglePieceFilter(piece, item);
+        });
+    });
+});
+
+function togglePieceFilter(piece, element) {
+    const index = filteredPieces.indexOf(piece);
+    
+    if (index === -1) {
+        // Ajouter le filtre
+        filteredPieces.push(piece);
+        element.classList.add('filtered');
+        console.log(`🚫 ${piece} exclue de la génération`);
+    } else {
+        // Retirer le filtre
+        filteredPieces.splice(index, 1);
+        element.classList.remove('filtered');
+        console.log(`✅ ${piece} réactivée`);
+    }
+    
+    console.log('Pièces filtrées:', filteredPieces);
+}
+
+function resetFilters() {
+    filteredPieces = [];
+    document.querySelectorAll('.piece-filter-item').forEach(item => {
+        item.classList.remove('filtered');
+    });
+    console.log('🔄 Tous les filtres réinitialisés');
+}
+
         const generateBtn = document.getElementById('generateBtn');
         const btnText = document.getElementById('btnText');
         const btnLoader = document.getElementById('btnLoader');
@@ -563,7 +731,8 @@ generateBtn.addEventListener('click', async () => {
                 target_max: targetMax,
                 material_diff: materialDiff,
                 max_material: maxMaterial,
-                max_attempts: maxAttempts
+                max_attempts: maxAttempts,
+                excluded_pieces: filteredPieces
             })
         });
 
