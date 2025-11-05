@@ -146,6 +146,10 @@ def serve_navbar_js():
 def serve_navbar_css():
     return send_from_directory('../frontend', 'navbar.css')
 
+@app.route('/global.css')
+def serve_global_css():
+    return send_from_directory('../frontend', 'global.css')
+
 # ========================================
 # ENREGISTREMENT DES BLUEPRINTS
 # ========================================
