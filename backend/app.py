@@ -240,6 +240,7 @@ def generate_position():
         material_diff = data.get('material_diff', 3)
         max_material = data.get('max_material', 22)
         max_attempts = data.get('max_attempts', 20000)
+        excluded_pieces = data.get('excluded_pieces', [])  # AJOUTER CETTE LIGNE
         
         # Validations
         if target_min < 0 or target_min > 99:
@@ -278,7 +279,30 @@ def generate_position():
                 'error': 'max_attempts doit être entre 1000 et 50000'
             }), 400
         
-        result = generate_fen_position(target_min, target_max, material_diff, max_material, max_attempts)
+        # Valider excluded_pieces
+        if not isinstance(excluded_pieces, list):
+            return jsonify({
+                'success': False,
+                'error': 'excluded_pieces doit être une liste'
+            }), 400
+        
+        valid_pieces = ['queen', 'rook', 'bishop', 'knight', 'pawn']
+        for piece in excluded_pieces:
+            if piece not in valid_pieces:
+                return jsonify({
+                    'success': False,
+                    'error': f'Pièce invalide: {piece}'
+                }), 400
+        
+        # MODIFIER L'APPEL À LA FONCTION
+        result = generate_fen_position(
+            target_min, 
+            target_max, 
+            material_diff, 
+            max_material, 
+            max_attempts,
+            excluded_pieces  # AJOUTER CE PARAMÈTRE
+        )
         
         return jsonify({
             'success': True,
