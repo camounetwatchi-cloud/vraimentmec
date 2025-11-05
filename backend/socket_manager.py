@@ -188,7 +188,7 @@ class Game:
         if player_color != self.board.turn:
             raise ValueError("Ce n'est pas votre tour de jouer.")
 
-try:
+        try:
             # Créer l'objet mouvement à partir de la chaîne UCI
             move = chess.Move.from_uci(uci_move)
             
