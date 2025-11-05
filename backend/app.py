@@ -839,7 +839,7 @@ def accept_challenge(challenge_id):
                 'error': 'Utilisateur introuvable'
             }), 404
         
-        import uuid
+import uuid
         game_id = str(uuid.uuid4())
         
         print(f"✅ Défi accepté: {challenge_id}")
@@ -847,7 +847,7 @@ def accept_challenge(challenge_id):
         print(f"   Accepteur: {user.username}")
         print(f"   Cadence: {challenge['time_control']['minutes']}+{challenge['time_control']['increment']}")
         
-       del challenges[challenge_id]
+        del challenges[challenge_id]  # ✅ BONNE INDENTATION
 
 # CRÉER RÉELLEMENT LA PARTIE DANS LE GESTIONNAIRE
 from backend.socket_manager import Game, games
