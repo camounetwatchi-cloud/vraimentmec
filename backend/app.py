@@ -347,13 +347,20 @@ def handle_join_game(data):
             challenger_sid = game_info['sids'][game_info['challenger_id']]
             accepter_sid = game_info['sids'][game_info['accepter_id']]
             
-            # Créer la partie avec les bons SIDs et couleurs
             game = Game.__new__(Game)
             game.game_id = game_id
             game.board = chess.Board(game_info['fen'])
             game.starting_fen = game_info['fen']
             game.moves_history = []
             game.started_at = game_info['created']
+            
+            # Ajout du time control
+            tc = game_info.get('time_control', {'minutes': 5, 'increment': 0})
+            game.time_control = tc
+            game.white_time = tc['minutes'] * 60
+            game.black_time = tc['minutes'] * 60
+            game.increment = tc.get('increment', 0)
+            game.last_move_time = game_info['created']
             
             from backend.db_models import User
             game.user1 = User.query.get(game_info['challenger_id'])
