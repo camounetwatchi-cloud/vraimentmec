@@ -1401,6 +1401,10 @@ socket.on('challenge_accepted', (data) => {
             playerColor = data.color;
             
             loadPosition(data.fen);
+            whiteTime = data.white_time || 300;
+            blackTime = data.black_time || 300;
+            updateTimers();
+            startTimers();
 
             socket.emit('join_game', {
             game_id: data.game_id
@@ -1675,6 +1679,82 @@ socket.on('challenge_accepted', (data) => {
             statusDiv.textContent = message;
             statusDiv.className = `status-message ${type}`;
         }
+function formatTime(seconds) {
+    if (seconds < 0) seconds = 0;
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function updateTimers() {
+    const playerTimerEl = document.getElementById('playerTimer');
+    const opponentTimerEl = document.getElementById('opponentTimer');
+    
+    const myTime = playerColor === 'white' ? whiteTime : blackTime;
+    const oppTime = playerColor === 'white' ? blackTime : whiteTime;
+    
+    playerTimerEl.textContent = formatTime(myTime);
+    opponentTimerEl.textContent = formatTime(oppTime);
+    
+    // Ajouter classe low-time si moins de 30 secondes
+    if (myTime < 30) {
+        playerTimerEl.classList.add('low-time');
+    } else {
+        playerTimerEl.classList.remove('low-time');
+    }
+    
+    if (oppTime < 30) {
+        opponentTimerEl.classList.add('low-time');
+    } else {
+        opponentTimerEl.classList.remove('low-time');
+    }
+    
+    // Ajouter classe active pour le joueur actuel
+    const turn = chessGame.turn();
+    if ((turn === 'w' && playerColor === 'white') || (turn === 'b' && playerColor === 'black')) {
+        playerTimerEl.classList.add('active');
+        opponentTimerEl.classList.remove('active');
+    } else {
+        playerTimerEl.classList.remove('active');
+        opponentTimerEl.classList.add('active');
+    }
+}
+
+function startTimers() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
+    
+    timerInterval = setInterval(() => {
+        const turn = chessGame.turn();
+        
+        if (turn === 'w') {
+            whiteTime -= 0.1;
+        } else {
+            blackTime -= 0.1;
+        }
+        
+        updateTimers();
+        
+        // Vérifier timeout
+        if (whiteTime <= 0 || blackTime <= 0) {
+            clearInterval(timerInterval);
+            const winner = whiteTime <= 0 ? 'black' : 'white';
+            showGameOver('timeout', {
+                winner: winner === playerColor ? currentUser.username : 'Adversaire',
+                reason: 'Temps écoulé'
+            });
+        }
+    }, 100);
+}
+
+function stopTimers() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+        
     </script>
 </body>
 </html>
