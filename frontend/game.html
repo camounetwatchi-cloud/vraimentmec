@@ -1620,6 +1620,7 @@ socket.on('challenge_accepted', (data) => {
         }
 
         function showGameOver(result, info) {
+            stopTimers();
             const modal = document.getElementById('gameOverModal');
             const title = document.getElementById('gameOverTitle');
             const message = document.getElementById('gameOverMessage');
@@ -1657,6 +1658,7 @@ socket.on('challenge_accepted', (data) => {
             gameMode = 'analysis';
             currentGame = null;
             playerColor = null;
+            stopTimers();
             selectedSquare = null;
 
             document.getElementById('modeIndicator').textContent = '📊 Mode Analyse';
