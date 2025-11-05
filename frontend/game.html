@@ -1321,32 +1321,29 @@
                 loadChallenges();
             });
 
-            socket.on('challenge_accepted', (data) => {
-                console.log('✅ Défi accepté:', data);
-                
-                if (currentUser && (data.challenger_id === currentUser.id || data.accepter_id === currentUser.id)) {
-                    console.log('🎮 Vous êtes impliqué dans ce défi !');
-                    
-                    const isChallenger = data.challenger_id === currentUser.id;
-                    const colors = ['white', 'black'];
-                    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                    
-                    playerColor = isChallenger ? randomColor : (randomColor === 'white' ? 'black' : 'white');
-                    
-                    startGame({
-                        game_id: data.game_id,
-                        challenge_id: data.challenge_id,
-                        color: playerColor,
-                        fen: data.fen,
-                        time_control: data.time_control,
-                        opponent: {
-                            username: isChallenger ? data.accepter_name : data.challenger_name
-                        }
-                    });
-                }
-                
-                loadChallenges();
-            });
+socket.on('challenge_accepted', (data) => {
+    console.log('✅ Défi accepté:', data);
+    
+    if (currentUser && (data.challenger_id === currentUser.id || data.accepter_id === currentUser.id)) {
+        console.log('🎮 Vous êtes impliqué dans ce défi !');
+        
+        const isChallenger = data.challenger_id === currentUser.id;
+        playerColor = isChallenger ? data.challenger_color : data.accepter_color;
+        
+        startGame({
+            game_id: data.game_id,
+            challenge_id: data.challenge_id,
+            color: playerColor,
+            fen: data.fen,
+            time_control: data.time_control,
+            opponent: {
+                username: isChallenger ? data.accepter_name : data.challenger_name
+            }
+        });
+    }
+    
+    loadChallenges();
+});
 
             socket.on('player_online', (data) => {
                 console.log('✅ Joueur en ligne:', data.username);
