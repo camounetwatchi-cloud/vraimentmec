@@ -406,7 +406,7 @@ def handle_join_game(data):
             emit('game_start', {
                 'white_time': game.white_time,
                 'black_time': game.black_time,
-                'time_control': game.time_control
+                'time_control': game.time_control,
                 'game_id': game_id,
                 'color': game.get_player_color(challenger_sid),
                 'fen': game.fen,
@@ -418,7 +418,7 @@ def handle_join_game(data):
             emit('game_start', {
                 'white_time': game.white_time,
                 'black_time': game.black_time,
-                'time_control': game.time_control
+                'time_control': game.time_control,
                 'game_id': game_id,
                 'color': game.get_player_color(accepter_sid),
                 'fen': game.fen,
