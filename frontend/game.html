@@ -578,6 +578,38 @@
             max-width: 550px;
         }
     }
+
+    .timer-display {
+    font-size: 1.5em;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-align: center;
+    margin-left: 10px;
+}
+
+.timer-display.active {
+    background: #baca44;
+    animation: pulse 1s infinite;
+}
+
+.timer-display.low-time {
+    background: #ffebee;
+    color: #d32f2f;
+    animation: pulse-danger 0.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+@keyframes pulse-danger {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
 </style>
 </head>
 <body>
