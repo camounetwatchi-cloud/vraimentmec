@@ -7,6 +7,7 @@ import random
 from datetime import timedelta, datetime
 from pathlib import Path
 import chess
+import uuid
 
 # Importer les modules du backend
 from backend.db_models import db, init_db, create_tables
@@ -626,7 +627,6 @@ def set_player_online():
             }), 401
         
         from backend.db_models import User
-        from datetime import datetime
         
         user = User.query.get(user_id)
         if not user:
@@ -710,8 +710,6 @@ challenges = {}
 @app.route('/api/challenges', methods=['GET'])
 def get_challenges():
     try:
-        from datetime import datetime, timedelta
-        
         now = datetime.utcnow()
         expired = []
         for challenge_id, challenge in challenges.items():
@@ -740,6 +738,71 @@ def get_challenges():
         
     except Exception as e:
         print(f"❌ Erreur get_challenges: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Erreur serveur'
+        }), 500
+
+@app.route('/api/challenges/create', methods=['POST'])
+def create_challenge():
+    try:
+        user_id = session.get('user_id')
+        
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'Non authentifié'
+            }), 401
+        
+        from backend.db_models import User
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'success': False,
+                'error': 'Utilisateur introuvable'
+            }), 404
+        
+        data = request.get_json()
+        fen = data.get('fen')
+        time_control = data.get('time_control', {'minutes': 5, 'increment': 0})
+        
+        if not fen:
+            return jsonify({
+                'success': False,
+                'error': 'FEN requis'
+            }), 400
+        
+        challenge_id = str(uuid.uuid4())
+        
+        challenges[challenge_id] = {
+            'id': challenge_id,
+            'challenger_id': user_id,
+            'challenger_name': user.username,
+            'challenger_elo': user.elo_rating,
+            'fen': fen,
+            'time_control': time_control,
+            'created_at': datetime.utcnow()
+        }
+        
+        print(f"✅ Défi créé: {challenge_id} par {user.username} ({time_control['minutes']}+{time_control['increment']})")
+        
+        socketio.emit('new_challenge', {
+            'challenge_id': challenge_id,
+            'challenger_name': user.username,
+            'time_control': time_control
+        })
+        
+        return jsonify({
+            'success': True,
+            'challenge_id': challenge_id,
+            'message': 'Défi créé avec succès'
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur create_challenge: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': 'Erreur serveur'
@@ -780,11 +843,6 @@ def accept_challenge(challenge_id):
                 'success': False,
                 'error': 'Utilisateur introuvable'
             }), 404
-        
-        # Imports déplacés ici, dans le try
-        import uuid
-        import random
-        from backend.socket_manager import Game, games
         
         game_id = str(uuid.uuid4())
         
