@@ -285,7 +285,49 @@
             color: #555;
             line-height: 1.6;
         }
+
+        /* CSS Échiquier - Ajouter après .info-box p */
+.board-container {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    margin: 20px 0;
+}
+
+.chessboard {
+    width: 100%;
+    max-width: 550px;
+    aspect-ratio: 1;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    border: 3px solid #333;
+    margin: 0 auto;
+}
+
+.square {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(30px, 6vw, 50px);
+    position: relative;
+}
+
+.square.light {
+    background-color: #f0d9b5;
+}
+
+.square.dark {
+    background-color: #b58863;
+}
+
+.piece {
+    user-select: none;
+}
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
 <body>
     <div class="navbar-wrapper">
@@ -362,60 +404,62 @@
             <div id="status" class="status hidden"></div>
 
             <div id="results" class="results hidden">
-                <h2>Résultats</h2>
-                <div class="result-card">
-                    <div class="result-item">
-                        <strong>FEN:</strong>
-                        <div class="fen-display">
-                            <code id="fenText"></code>
-                            <button class="copy-btn" onclick="copyFEN()">📋 Copier</button>
-                        </div>
-                    </div>
-                    <div class="result-grid">
-                        <div class="result-item">
-                            <strong>Matériel Blanc:</strong>
-                            <span id="whiteMaterial"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Matériel Noir:</strong>
-                            <span id="blackMaterial"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Différence:</strong>
-                            <span id="materialDiff"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Trait:</strong>
-                            <span id="turn"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Éval Ligne 1:</strong>
-                            <span id="evalLine1"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Éval Ligne 2:</strong>
-                            <span id="evalLine2"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Tentatives:</strong>
-                            <span id="attempts"></span>
-                        </div>
-                        <div class="result-item">
-                            <strong>Temps:</strong>
-                            <span id="timeSeconds"></span>
-                        </div>
-                    </div>
-                    
-                    <div class="actions">
-                        <a id="lichessLink" href="#" target="_blank" class="action-btn lichess-btn">
-                            📊 Analyser sur Lichess
-                        </a>
-                        <a id="chesscomLink" href="#" target="_blank" class="action-btn chesscom-btn">
-                            🔍 Voir sur Chess.com
-                        </a>
-                    </div>
-                </div>
+    <h2>Résultats</h2>
+    <div class="result-card">
+        <!-- Échiquier visuel -->
+        <div class="board-container">
+            <div class="chessboard" id="resultChessboard"></div>
+        </div>
+
+        <div class="result-item">
+            <strong>FEN:</strong>
+            <div class="fen-display">
+                <code id="fenText"></code>
+                <button class="copy-btn" onclick="copyFEN()">📋 Copier</button>
             </div>
+        </div>
+        <div class="result-grid">
+            <div class="result-item">
+                <strong>Matériel Blanc:</strong>
+                <span id="whiteMaterial"></span>
+            </div>
+            <div class="result-item">
+                <strong>Matériel Noir:</strong>
+                <span id="blackMaterial"></span>
+            </div>
+            <div class="result-item">
+                <strong>Différence:</strong>
+                <span id="materialDiff"></span>
+            </div>
+            <div class="result-item">
+                <strong>Trait:</strong>
+                <span id="turn"></span>
+            </div>
+            <div class="result-item">
+                <strong>Éval Ligne 1:</strong>
+                <span id="evalLine1"></span>
+            </div>
+            <div class="result-item">
+                <strong>Éval Ligne 2:</strong>
+                <span id="evalLine2"></span>
+            </div>
+            <div class="result-item">
+                <strong>Tentatives:</strong>
+                <span id="attempts"></span>
+            </div>
+            <div class="result-item">
+                <strong>Temps:</strong>
+                <span id="timeSeconds"></span>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <a id="lichessLink" href="#" target="_blank" class="action-btn lichess-btn">
+                📊 Analyser sur Lichess
+            </a>
+        </div>
+    </div>
+</div>
         </main>
 
         <footer>
@@ -477,25 +521,64 @@ generateBtn.addEventListener('click', async () => {
             }
         });
 
-        // Afficher les résultats
-        function displayResults(data) {
-            document.getElementById('fenText').textContent = data.fen;
-            document.getElementById('whiteMaterial').textContent = data.white_material;
-            document.getElementById('blackMaterial').textContent = data.black_material;
-            document.getElementById('materialDiff').textContent = data.material_difference;
-            document.getElementById('turn').textContent = data.turn;
-            document.getElementById('evalLine1').textContent = data.eval_line1;
-            document.getElementById('evalLine2').textContent = data.eval_line2;
-            document.getElementById('attempts').textContent = data.attempts.toLocaleString();
-            document.getElementById('timeSeconds').textContent = `${data.time_seconds}s`;
+// Unicode chess pieces
+const PIECES = {
+    'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
+    'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
+};
 
-            // Liens d'analyse
-            const fenEncoded = encodeURIComponent(data.fen);
-            document.getElementById('lichessLink').href = `https://lichess.org/analysis/${fenEncoded}`;
-            document.getElementById('chesscomLink').href = `https://www.chess.com/analysis?fen=${fenEncoded}`;
+// Afficher les résultats
+function displayResults(data) {
+    document.getElementById('fenText').textContent = data.fen;
+    document.getElementById('whiteMaterial').textContent = data.white_material;
+    document.getElementById('blackMaterial').textContent = data.black_material;
+    document.getElementById('materialDiff').textContent = data.material_difference;
+    document.getElementById('turn').textContent = data.turn;
+    document.getElementById('evalLine1').textContent = data.eval_line1;
+    document.getElementById('evalLine2').textContent = data.eval_line2;
+    document.getElementById('attempts').textContent = data.attempts.toLocaleString();
+    document.getElementById('timeSeconds').textContent = `${data.time_seconds}s`;
 
-            resultsDiv.classList.remove('hidden');
+    // Lien d'analyse Lichess avec la bonne syntaxe
+    document.getElementById('lichessLink').href = `https://lichess.org/analysis/standard/${data.fen.replace(/ /g, '_')}`;
+
+    // Afficher l'échiquier
+    renderBoard(data.fen);
+
+    resultsDiv.classList.remove('hidden');
+}
+
+// Fonction pour afficher l'échiquier
+function renderBoard(fen) {
+    const chessboard = document.getElementById('resultChessboard');
+    chessboard.innerHTML = '';
+    
+    try {
+        const game = new Chess(fen);
+        const boardArray = game.board();
+        
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const square = document.createElement('div');
+                square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                
+                const piece = boardArray[row][col];
+                
+                if (piece) {
+                    const pieceSymbol = piece.type.toUpperCase();
+                    const pieceColor = piece.color === 'w' ? pieceSymbol : pieceSymbol.toLowerCase();
+                    square.textContent = PIECES[pieceColor] || '';
+                    square.classList.add('piece');
+                }
+                
+                chessboard.appendChild(square);
+            }
         }
+    } catch (error) {
+        console.error('Erreur rendu échiquier:', error);
+        chessboard.innerHTML = '<p style="text-align: center; color: #999;">Erreur d\'affichage</p>';
+    }
+}
 
         // Afficher un message de statut
         function showStatus(message, type) {
