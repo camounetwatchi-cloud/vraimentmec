@@ -234,14 +234,42 @@ def generate_position():
     try:
         data = request.get_json()
         
+        # Récupérer les paramètres avec valeurs par défaut
         target_min = data.get('target_min', 25)
         target_max = data.get('target_max', 100)
+        material_diff = data.get('material_diff', 3)
+        max_material = data.get('max_material', 22)
         max_attempts = data.get('max_attempts', 20000)
+        
+        # Validations
+        if target_min < 0 or target_min > 99:
+            return jsonify({
+                'success': False,
+                'error': 'target_min doit être entre 0 et 99'
+            }), 400
+        
+        if target_max < 1 or target_max > 99:
+            return jsonify({
+                'success': False,
+                'error': 'target_max doit être entre 1 et 99'
+            }), 400
         
         if target_min >= target_max:
             return jsonify({
                 'success': False,
                 'error': 'target_min doit être inférieur à target_max'
+            }), 400
+        
+        if material_diff < 0 or material_diff > 6:
+            return jsonify({
+                'success': False,
+                'error': 'material_diff doit être entre 0 et 6'
+            }), 400
+        
+        if max_material < 10 or max_material > 25:
+            return jsonify({
+                'success': False,
+                'error': 'max_material doit être entre 10 et 25'
             }), 400
         
         if max_attempts < 1000 or max_attempts > 50000:
@@ -250,7 +278,7 @@ def generate_position():
                 'error': 'max_attempts doit être entre 1000 et 50000'
             }), 400
         
-        result = generate_fen_position(target_min, target_max, max_attempts)
+        result = generate_fen_position(target_min, target_max, material_diff, max_material, max_attempts)
         
         return jsonify({
             'success': True,
