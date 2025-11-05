@@ -1317,6 +1317,9 @@
             socket.on('move_made', (data) => {
                 console.log('♟️ Coup joué:', data.move);
                 loadPosition(data.fen);
+                if (data.white_time !== undefined) whiteTime = data.white_time;
+                if (data.black_time !== undefined) blackTime = data.black_time;
+                updateTimers();
                 
                 if (data.status === 'checkmate' || data.status === 'stalemate' || data.info.result) {
                     showGameOver(data.status, data.info);
