@@ -1365,6 +1365,10 @@
             playerColor = data.color;
             
             loadPosition(data.fen);
+
+            socket.emit('join_game', {
+            game_id: data.game_id
+    });
             
             const timeControl = data.time_control ? `${data.time_control.minutes}+${data.time_control.increment}` : '';
             document.getElementById('modeIndicator').textContent = `🎮 Partie en cours ${timeControl}`;
