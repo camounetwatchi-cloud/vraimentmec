@@ -326,30 +326,32 @@
         </header>
 
         <main>
-            <div class="info-box">
-                <h3>⚡ Comment ça marche ?</h3>
-                <p>
-                    Ce générateur utilise Stockfish pour créer des positions d'échecs équilibrées avec un léger déséquilibre matériel. 
-                    La génération peut prendre jusqu'à 2 minutes selon les paramètres.
-                </p>
-            </div>
+    <div class="info-box">
+        <h3>⚡ Comment ça marche ?</h3>
+        <p style="margin-bottom: 12px;">
+            Ce générateur crée des positions d'échecs équilibrées avec un déséquilibre matériel en suivant ces règles strictes :
+        </p>
+        <ul style="text-align: left; padding-left: 20px; line-height: 1.8;">
+            <li><strong>Déséquilibre matériel :</strong> Différence de 3 à 6 points entre les deux camps</li>
+            <li><strong>Matériel limité :</strong> Maximum 22 points par côté (Dame=9, Tour=5, Fou/Cavalier=3, Pion=1)</li>
+            <li><strong>Fous de couleurs opposées :</strong> Chaque camp a au maximum 1 fou sur cases blanches et 1 sur cases noires</li>
+            <li><strong>Évaluation Stockfish :</strong> La position doit avoir une évaluation entre +0.25 et +1.00 pion (ou -0.25 à -1.00) sur les 2 meilleures variantes</li>
+            <li><strong>Profondeur d'analyse :</strong> Stockfish analyse à 30 coups de profondeur avec 0.5s par position</li>
+        </ul>
+        <p style="margin-top: 12px; color: #856404;">
+            ⏱️ La génération peut prendre jusqu'à 2 minutes selon le nombre de tentatives.
+        </p>
+    </div>
 
-            <div class="controls-section">
-                <h2>Paramètres de Génération</h2>
-                <div class="controls">
-                    <div class="control-group">
-                        <label for="targetMin">Évaluation min (centipawns):</label>
-                        <input type="number" id="targetMin" value="25" min="0" max="500">
-                    </div>
-                    <div class="control-group">
-                        <label for="targetMax">Évaluation max (centipawns):</label>
-                        <input type="number" id="targetMax" value="100" min="0" max="500">
-                    </div>
-                    <div class="control-group">
-                        <label for="maxAttempts">Tentatives maximum:</label>
-                        <input type="number" id="maxAttempts" value="20000" min="1000" max="50000" step="1000">
-                    </div>
-                </div>
+<div class="controls">
+    <div class="control-group">
+        <label for="maxAttempts">Tentatives maximum:</label>
+        <input type="number" id="maxAttempts" value="20000" min="1000" max="50000" step="1000">
+        <small style="color: #666; margin-top: 5px; display: block;">
+            Plus le nombre est élevé, plus la position sera proche de l'équilibre
+        </small>
+    </div>
+</div>
                 
                 <button id="generateBtn" class="generate-btn">
                     <span id="btnText">🎲 Générer une position</span>
