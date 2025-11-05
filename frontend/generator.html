@@ -328,6 +328,74 @@
     font-weight: bold;
 }
 
+/* Range sliders */
+.range-container {
+    position: relative;
+    padding: 10px 0;
+}
+
+.range-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: #e0e0e0;
+    outline: none;
+    margin: 10px 0;
+}
+
+.range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+    background: #5568d3;
+    transform: scale(1.2);
+}
+
+.range-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s;
+}
+
+.range-slider::-moz-range-thumb:hover {
+    background: #5568d3;
+    transform: scale(1.2);
+}
+
+.range-values {
+    text-align: center;
+    font-weight: 600;
+    color: #667eea;
+    margin-top: 8px;
+    font-size: 1.1em;
+}
+
+.control-group label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.control-group label span {
+    color: #667eea;
+    font-weight: 600;
+    font-size: 1.1em;
+}
+
 .reset-filters-btn {
     margin-top: 15px;
     padding: 8px 12px;
@@ -492,38 +560,31 @@
     </div>
 
 <div class="controls">
+    <!-- Évaluation Range -->
     <div class="control-group">
-        <label for="targetMin">Évaluation min (centipions):</label>
-        <input type="number" id="targetMin" value="25" min="0" max="99" step="5">
-        <small style="color: #666; margin-top: 5px; display: block;">
-            Entre 0 et 99 centipions
-        </small>
+        <label>Évaluation (centipions):</label>
+        <div class="range-container">
+            <input type="range" id="targetMin" min="0" max="99" value="25" step="5" class="range-slider">
+            <input type="range" id="targetMax" min="0" max="99" value="100" step="5" class="range-slider">
+            <div class="range-values">
+                <span id="targetMinValue">25</span> - <span id="targetMaxValue">100</span> centipions
+            </div>
+        </div>
     </div>
     
+    <!-- Écart matériel -->
     <div class="control-group">
-        <label for="targetMax">Évaluation max (centipions):</label>
-        <input type="number" id="targetMax" value="100" min="1" max="99" step="5">
-        <small style="color: #666; margin-top: 5px; display: block;">
-            Entre 1 et 99 centipions
-        </small>
+        <label for="materialDiff">Écart matériel minimum: <span id="materialDiffValue">3</span></label>
+        <input type="range" id="materialDiff" min="0" max="6" value="3" step="1" class="range-slider">
     </div>
     
+    <!-- Matériel max -->
     <div class="control-group">
-        <label for="materialDiff">Écart matériel:</label>
-        <input type="number" id="materialDiff" value="3" min="0" max="6" step="1">
-        <small style="color: #666; margin-top: 5px; display: block;">
-            Différence entre 0 et 6 points
-        </small>
+        <label for="maxMaterial">Matériel max par côté: <span id="maxMaterialValue">22</span></label>
+        <input type="range" id="maxMaterial" min="10" max="25" value="22" step="1" class="range-slider">
     </div>
     
-    <div class="control-group">
-        <label for="maxMaterial">Matériel max par côté:</label>
-        <input type="number" id="maxMaterial" value="22" min="10" max="25" step="1">
-        <small style="color: #666; margin-top: 5px; display: block;">
-            Entre 10 et 25 points
-        </small>
-    </div>
-    
+    <!-- Tentatives (garder en input classique) -->
     <div class="control-group">
         <label for="maxAttempts">Tentatives maximum:</label>
         <input type="number" id="maxAttempts" value="20000" min="1000" max="50000" step="1000">
@@ -612,6 +673,52 @@ let filteredPieces = [];
 
 // Initialiser les événements de filtrage
 document.addEventListener('DOMContentLoaded', () => {
+    // Gestion des sliders
+const targetMinSlider = document.getElementById('targetMin');
+const targetMaxSlider = document.getElementById('targetMax');
+const targetMinValue = document.getElementById('targetMinValue');
+const targetMaxValue = document.getElementById('targetMaxValue');
+const materialDiffSlider = document.getElementById('materialDiff');
+const materialDiffValue = document.getElementById('materialDiffValue');
+const maxMaterialSlider = document.getElementById('maxMaterial');
+const maxMaterialValue = document.getElementById('maxMaterialValue');
+
+// Update évaluation min/max
+targetMinSlider.addEventListener('input', () => {
+    let min = parseInt(targetMinSlider.value);
+    let max = parseInt(targetMaxSlider.value);
+    
+    if (min >= max) {
+        targetMaxSlider.value = min + 5;
+        max = min + 5;
+    }
+    
+    targetMinValue.textContent = min;
+    targetMaxValue.textContent = max;
+});
+
+targetMaxSlider.addEventListener('input', () => {
+    let min = parseInt(targetMinSlider.value);
+    let max = parseInt(targetMaxSlider.value);
+    
+    if (max <= min) {
+        targetMinSlider.value = max - 5;
+        min = max - 5;
+    }
+    
+    targetMinValue.textContent = min;
+    targetMaxValue.textContent = max;
+});
+
+// Update écart matériel
+materialDiffSlider.addEventListener('input', () => {
+    materialDiffValue.textContent = materialDiffSlider.value;
+});
+
+// Update matériel max
+maxMaterialSlider.addEventListener('input', () => {
+    maxMaterialValue.textContent = maxMaterialSlider.value;
+});
     const pieceItems = document.querySelectorAll('.piece-filter-item');
     
     pieceItems.forEach(item => {
@@ -621,6 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+    
 
 function togglePieceFilter(piece, element) {
     const index = filteredPieces.indexOf(piece);
