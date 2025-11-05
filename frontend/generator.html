@@ -438,16 +438,14 @@
         const resultsDiv = document.getElementById('results');
 
         // Gestionnaire du bouton de génération
-        generateBtn.addEventListener('click', async () => {
-            const targetMin = parseInt(document.getElementById('targetMin').value);
-            const targetMax = parseInt(document.getElementById('targetMax').value);
-            const maxAttempts = parseInt(document.getElementById('maxAttempts').value);
+generateBtn.addEventListener('click', async () => {
+    const maxAttempts = parseInt(document.getElementById('maxAttempts').value);
 
-            // Validation
-            if (targetMin >= targetMax) {
-                showStatus('Erreur: L\'évaluation min doit être inférieure à l\'évaluation max', 'error');
-                return;
-            }
+    // Validation
+    if (maxAttempts < 1000 || maxAttempts > 50000) {
+        showStatus('Erreur: Le nombre de tentatives doit être entre 1000 et 50000', 'error');
+        return;
+    }
 
             // Désactiver le bouton et afficher le loader
             generateBtn.disabled = true;
@@ -462,11 +460,9 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        target_min: targetMin,
-                        target_max: targetMax,
-                        max_attempts: maxAttempts
-                    })
+                body: JSON.stringify({
+                    max_attempts: maxAttempts
+                })
                 });
 
                 const result = await response.json();
