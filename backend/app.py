@@ -745,8 +745,8 @@ def get_challenges():
             'error': 'Erreur serveur'
         }), 500
 
-@app.route('/api/challenges/create', methods=['POST'])
-def create_challenge():
+@app.route('/api/challenges/<challenge_id>/accept', methods=['POST'])
+def accept_challenge(challenge_id):
     try:
         user_id = session.get('user_id')
         
@@ -756,48 +756,97 @@ def create_challenge():
                 'error': 'Non authentifié'
             }), 401
         
+        if challenge_id not in challenges:
+            return jsonify({
+                'success': False,
+                'error': 'Défi introuvable ou expiré'
+            }), 404
+        
+        challenge = challenges[challenge_id]
+        
+        if challenge['challenger_id'] == user_id:
+            return jsonify({
+                'success': False,
+                'error': 'Vous ne pouvez pas accepter votre propre défi'
+            }), 400
+        
         from backend.db_models import User
-        from datetime import datetime
-        import uuid
         
         user = User.query.get(user_id)
-        if not user:
+        challenger = User.query.get(challenge['challenger_id'])
+        
+        if not user or not challenger:
             return jsonify({
                 'success': False,
                 'error': 'Utilisateur introuvable'
             }), 404
         
-        data = request.get_json()
-        fen = data.get('fen', chess.STARTING_FEN)
-        time_control = data.get('time_control', {'minutes': 5, 'increment': 0})
+        # Imports déplacés ici, dans le try
+        import uuid
+        import random
+        from backend.socket_manager import Game, games
         
-        challenge_id = str(uuid.uuid4())
-        challenges[challenge_id] = {
-            'challenger_id': user_id,
-            'challenger_name': user.username,
-            'challenger_elo': user.elo_rating,
-            'fen': fen,
-            'time_control': time_control,
-            'created_at': datetime.utcnow()
+        game_id = str(uuid.uuid4())
+        
+        print(f"✅ Défi accepté: {challenge_id}")
+        print(f"   Challenger: {challenger.username}")
+        print(f"   Accepteur: {user.username}")
+        print(f"   Cadence: {challenge['time_control']['minutes']}+{challenge['time_control']['increment']}")
+        
+        del challenges[challenge_id]
+        
+        # Attribution aléatoire des couleurs
+        colors = ['white', 'black']
+        challenger_color = random.choice(colors)
+        accepter_color = 'black' if challenger_color == 'white' else 'white'
+        
+        # Créer un mapping temporaire pour retrouver la partie
+        game_info = {
+            'game_id': game_id,
+            'challenger_id': challenge['challenger_id'],
+            'accepter_id': user_id,
+            'challenger_color': challenger_color,
+            'accepter_color': accepter_color,
+            'fen': challenge['fen'],
+            'time_control': challenge['time_control'],
+            'challenger_name': challenger.username,
+            'accepter_name': user.username,
+            'created': datetime.utcnow()
         }
         
-        print(f"✅ Défi créé: {challenge_id} par {user.username} ({time_control['minutes']}+{time_control['increment']})")
+        # Stocker temporairement les infos de la partie
+        if not hasattr(app, 'pending_games'):
+            app.pending_games = {}
+        app.pending_games[game_id] = game_info
         
-        socketio.emit('new_challenge', {
+        print(f"✅ Partie créée en attente: {game_id}")
+        print(f"   {challenger.username} ({challenger_color}) vs {user.username} ({accepter_color})")
+        print(f"   Cadence: {challenge['time_control']['minutes']}+{challenge['time_control']['increment']}")
+        
+        socketio.emit('challenge_accepted', {
             'challenge_id': challenge_id,
-            'challenger_name': user.username,
-            'challenger_elo': user.elo_rating,
-            'time_control': time_control
+            'game_id': game_id,
+            'challenger_id': challenge['challenger_id'],
+            'accepter_id': user_id,
+            'challenger_name': challenger.username,
+            'accepter_name': user.username,
+            'challenger_color': challenger_color,
+            'accepter_color': accepter_color,
+            'fen': challenge['fen'],
+            'time_control': challenge['time_control']
         })
         
         return jsonify({
             'success': True,
+            'game_id': game_id,
             'challenge_id': challenge_id,
-            'message': 'Défi créé avec succès'
+            'message': 'Défi accepté ! La partie va commencer...'
         })
         
     except Exception as e:
-        print(f"❌ Erreur create_challenge: {e}")
+        print(f"❌ Erreur accept_challenge: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': 'Erreur serveur'
