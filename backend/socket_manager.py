@@ -213,11 +213,11 @@ class Game:
                 status = 'draw_insufficient'
                 result = 'draw'
                 
-            elif self.board.is_seventy_five_moves():
-                status = 'draw_75_moves'
+elif self.board.can_claim_fifty_moves():
+                status = 'draw_50_moves'
                 result = 'draw'
                 
-            elif self.board.is_fivefold_repetition():
+            elif self.board.can_claim_threefold_repetition():
                 status = 'draw_repetition'
                 result = 'draw'
                 
