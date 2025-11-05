@@ -387,10 +387,42 @@
 
 <div class="controls">
     <div class="control-group">
+        <label for="targetMin">Évaluation min (centipions):</label>
+        <input type="number" id="targetMin" value="25" min="0" max="99" step="5">
+        <small style="color: #666; margin-top: 5px; display: block;">
+            Entre 0 et 99 centipions
+        </small>
+    </div>
+    
+    <div class="control-group">
+        <label for="targetMax">Évaluation max (centipions):</label>
+        <input type="number" id="targetMax" value="100" min="1" max="99" step="5">
+        <small style="color: #666; margin-top: 5px; display: block;">
+            Entre 1 et 99 centipions
+        </small>
+    </div>
+    
+    <div class="control-group">
+        <label for="materialDiff">Écart matériel:</label>
+        <input type="number" id="materialDiff" value="3" min="0" max="6" step="1">
+        <small style="color: #666; margin-top: 5px; display: block;">
+            Différence entre 0 et 6 points
+        </small>
+    </div>
+    
+    <div class="control-group">
+        <label for="maxMaterial">Matériel max par côté:</label>
+        <input type="number" id="maxMaterial" value="22" min="10" max="25" step="1">
+        <small style="color: #666; margin-top: 5px; display: block;">
+            Entre 10 et 25 points
+        </small>
+    </div>
+    
+    <div class="control-group">
         <label for="maxAttempts">Tentatives maximum:</label>
         <input type="number" id="maxAttempts" value="20000" min="1000" max="50000" step="1000">
         <small style="color: #666; margin-top: 5px; display: block;">
-            Plus le nombre est élevé, plus la position sera proche de l'équilibre
+            Plus élevé = position plus équilibrée
         </small>
     </div>
 </div>
@@ -477,49 +509,82 @@
 
         // Gestionnaire du bouton de génération
 generateBtn.addEventListener('click', async () => {
+    const targetMin = parseInt(document.getElementById('targetMin').value);
+    const targetMax = parseInt(document.getElementById('targetMax').value);
+    const materialDiff = parseInt(document.getElementById('materialDiff').value);
+    const maxMaterial = parseInt(document.getElementById('maxMaterial').value);
     const maxAttempts = parseInt(document.getElementById('maxAttempts').value);
 
-    // Validation
+    // Validations
+    if (targetMin < 0 || targetMin > 99) {
+        showStatus('Erreur: Évaluation min doit être entre 0 et 99', 'error');
+        return;
+    }
+    
+    if (targetMax < 1 || targetMax > 99) {
+        showStatus('Erreur: Évaluation max doit être entre 1 et 99', 'error');
+        return;
+    }
+    
+    if (targetMin >= targetMax) {
+        showStatus('Erreur: Évaluation min doit être inférieure à évaluation max', 'error');
+        return;
+    }
+    
+    if (materialDiff < 0 || materialDiff > 6) {
+        showStatus('Erreur: Écart matériel doit être entre 0 et 6', 'error');
+        return;
+    }
+    
+    if (maxMaterial < 10 || maxMaterial > 25) {
+        showStatus('Erreur: Matériel max doit être entre 10 et 25', 'error');
+        return;
+    }
+    
     if (maxAttempts < 1000 || maxAttempts > 50000) {
-        showStatus('Erreur: Le nombre de tentatives doit être entre 1000 et 50000', 'error');
+        showStatus('Erreur: Tentatives doivent être entre 1000 et 50000', 'error');
         return;
     }
 
-            // Désactiver le bouton et afficher le loader
-            generateBtn.disabled = true;
-            btnText.style.display = 'none';
-            btnLoader.style.display = 'inline-block';
-            resultsDiv.classList.add('hidden');
-            showStatus('⏳ Génération en cours avec Stockfish... Cela peut prendre jusqu\'à 2 minutes.', 'info');
+    // Désactiver le bouton et afficher le loader
+    generateBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline-block';
+    resultsDiv.classList.add('hidden');
+    showStatus('⏳ Génération en cours avec Stockfish... Cela peut prendre jusqu\'à 2 minutes.', 'info');
 
-            try {
-                const response = await fetch(`${API_URL}/api/generate`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                body: JSON.stringify({
-                    max_attempts: maxAttempts
-                })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    displayResults(result.data);
-                    showStatus('✅ Position générée avec succès par Stockfish !', 'success');
-                } else {
-                    showStatus(`❌ Erreur: ${result.error}`, 'error');
-                }
-            } catch (error) {
-                showStatus(`❌ Erreur de connexion: ${error.message}. Vérifiez que le backend est démarré.`, 'error');
-            } finally {
-                // Réactiver le bouton
-                generateBtn.disabled = false;
-                btnText.style.display = 'inline';
-                btnLoader.style.display = 'none';
-            }
+    try {
+        const response = await fetch(`${API_URL}/api/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                target_min: targetMin,
+                target_max: targetMax,
+                material_diff: materialDiff,
+                max_material: maxMaterial,
+                max_attempts: maxAttempts
+            })
         });
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayResults(result.data);
+            showStatus('✅ Position générée avec succès par Stockfish !', 'success');
+        } else {
+            showStatus(`❌ Erreur: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showStatus(`❌ Erreur de connexion: ${error.message}. Vérifiez que le backend est démarré.`, 'error');
+    } finally {
+        // Réactiver le bouton
+        generateBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
 
 // Unicode chess pieces
 const PIECES = {
