@@ -62,10 +62,21 @@ except Exception as e:
 
 # --- Reste des fonctions (inchangées, sauf l'appel à l'engine) ---
 
-def generate_pieces_with_imbalance():
+def generate_pieces_with_imbalance(max_material, material_diff):
     """Génère une liste de pièces garantissant un déséquilibre matériel."""
-    strong_side_material = random.randint(17, 22)
-    weak_side_material = strong_side_material - random.randint(3, 6)
+    # Calculer les limites basées sur les paramètres
+    max_strong = min(max_material, 22)  # Ne jamais dépasser 22 (limite technique)
+    min_weak = max(10, max_strong - 6)  # Minimum 10 points
+    
+    strong_side_material = random.randint(max_strong - 3, max_strong)
+    
+    if material_diff == 0:
+        weak_side_material = strong_side_material
+    else:
+        weak_side_material = strong_side_material - random.randint(material_diff, min(material_diff + 2, 6))
+    
+    # S'assurer que le côté faible a au moins 10 points
+    weak_side_material = max(weak_side_material, 10)
     
     pieces_strong = []
     pieces_weak = []
@@ -92,7 +103,7 @@ def get_square_color(square: chess.Square) -> bool:
     """Détermine la couleur de la case."""
     return (chess.square_rank(square) + chess.square_file(square)) % 2 == 0
 
-def generate_optimized_random_fen():
+def generate_optimized_random_fen(max_material, material_diff):
     """Génère une FEN avec déséquilibre matériel intégré."""
     board = chess.Board(None)
     
@@ -106,7 +117,7 @@ def generate_optimized_random_fen():
     available_squares = list(set(chess.SQUARES) - set(king_squares))
     random.shuffle(available_squares)
     
-    pieces_strong, pieces_weak = generate_pieces_with_imbalance()
+    pieces_strong, pieces_weak = generate_pieces_with_imbalance(max_material, material_diff)
     
     if random.choice([True, False]):
         white_pieces, black_pieces = pieces_strong, pieces_weak
@@ -182,6 +193,11 @@ def is_material_compensated(board: chess.Board, min_diff: float):
     """Vérifie déséquilibre matériel."""
     white_mat, black_mat = calculate_material_value(board)
     difference = abs(white_mat - black_mat)
+    
+    # Si min_diff est 0, accepter toute position
+    if min_diff == 0:
+        return True, white_mat, black_mat
+    
     return difference >= min_diff, white_mat, black_mat
 
 def check_piece_difference(board: chess.Board, min_piece_diff: int):
@@ -253,8 +269,16 @@ def get_stockfish_evaluation_batch(fens: list):
 
     return results
 
-def generate_fen_position(target_min=10, target_max=75, max_attempts=20000):
-    """Fonction principale appelée par l'API"""
+def generate_fen_position(target_min=25, target_max=100, material_diff=3, max_material=22, max_attempts=20000):
+    """Fonction principale appelée par l'API
+    
+    Args:
+        target_min: Évaluation minimum en centipions (0-99)
+        target_max: Évaluation maximum en centipions (1-99)
+        material_diff: Différence matérielle minimum (0-6)
+        max_material: Matériel maximum par côté (10-25)
+        max_attempts: Nombre maximum de tentatives
+    """
     global engine
     start_time = time.time()
     tentatives = 0
@@ -262,29 +286,42 @@ def generate_fen_position(target_min=10, target_max=75, max_attempts=20000):
     if not engine:
         raise Exception(f"Le moteur Stockfish n'est pas initialisé. Chemin: {STOCKFISH_PATH}")
     
+    # Validation des paramètres
+    if target_min < 0 or target_min > 99:
+        raise ValueError("target_min doit être entre 0 et 99")
+    if target_max < 1 or target_max > 99:
+        raise ValueError("target_max doit être entre 1 et 99")
+    if target_min >= target_max:
+        raise ValueError("target_min doit être inférieur à target_max")
+    if material_diff < 0 or material_diff > 6:
+        raise ValueError("material_diff doit être entre 0 et 6")
+    if max_material < 10 or max_material > 25:
+        raise ValueError("max_material doit être entre 10 et 25")
+    
     try:
         BATCH_SIZE = 5
         candidates_buffer = []
         
+        # Définir MIN_PIECE_DIFFERENCE selon material_diff
+        min_piece_diff = 1 if material_diff >= 2 else 0
+        
         while tentatives < max_attempts:
             tentatives += 1
             
-            fen, board = generate_optimized_random_fen()
+            fen, board = generate_optimized_random_fen(max_material, material_diff)
             is_legal, board = is_fen_legal((fen, board))
             
             if not is_legal:
                 continue
             
-            is_compensated_mat, white_mat, black_mat = is_material_compensated(board, MIN_MATERIAL_DIFFERENCE)
-            is_compensated_piece = check_piece_difference(board, MIN_PIECE_DIFFERENCE)
+            is_compensated_mat, white_mat, black_mat = is_material_compensated(board, material_diff)
+            is_compensated_piece = check_piece_difference(board, min_piece_diff)
             
             if is_compensated_mat and is_compensated_piece:
                 candidates_buffer.append((fen, board, white_mat, black_mat))
                 
                 if len(candidates_buffer) >= BATCH_SIZE:
                     fens_to_analyze = [c[0] for c in candidates_buffer]
-                    
-                    # On ne passe plus l'engine en paramètre
                     results = get_stockfish_evaluation_batch(fens_to_analyze)
                     
                     for (fen, board, w_mat, b_mat), (scores_cp, scores_str) in zip(candidates_buffer, results):
@@ -311,7 +348,4 @@ def generate_fen_position(target_min=10, target_max=75, max_attempts=20000):
         raise Exception("Position non trouvée après maximum de tentatives")
     
     finally:
-        # L'engine est géré par la fonction generate_fen_position si elle l'ouvre,
-        # mais ici on s'assure qu'il est fermé si une exception non gérée le laissait ouvert.
-        # Note: L'engine global n'est plus utilisé pour l'analyse pour la robustesse.
-        pass # La fermeture est maintenant dans get_stockfish_evaluation_batch
+        pass
