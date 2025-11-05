@@ -275,7 +275,7 @@
     transform: translateY(-50%);
     background: white;
     border-radius: 15px;
-    padding: 15px 10px
+    padding: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     z-index: 100;
     width: 150px;
@@ -293,6 +293,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    align-items: center;
 }
 
 .piece-filter-item {
@@ -375,6 +376,38 @@
 .range-slider::-moz-range-thumb:hover {
     background: #5568d3;
     transform: scale(1.2);
+}
+
+.range-slider-dual {
+    position: absolute;
+    pointer-events: none;
+    background: transparent;
+}
+
+.range-slider-dual::-webkit-slider-thumb {
+    pointer-events: all;
+}
+
+.range-slider-dual::-moz-range-thumb {
+    pointer-events: all;
+}
+
+.range-slider-dual::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, 
+        #e0e0e0 0%, 
+        #e0e0e0 var(--min-percent), 
+        #667eea var(--min-percent), 
+        #667eea var(--max-percent), 
+        #e0e0e0 var(--max-percent), 
+        #e0e0e0 100%);
+}
+
+.range-slider-dual:nth-of-type(1)::-webkit-slider-thumb {
+    z-index: 2;
+}
+
+.range-slider-dual:nth-of-type(2)::-webkit-slider-thumb {
+    z-index: 3;
 }
 
 .range-values {
@@ -545,7 +578,7 @@
         <h3>This generator creates playable and (almost) equal positions. Here are the non-modifiable conditions</h3>           
         <ul style="text-align: left; padding-left: 20px; line-height: 1.8;">
             <li><strong>At least 2 "equal" lines</strong> To avoid boring lines and perpetuals</li>
-            <li><strong>A maximum disadvantage/advantage of 1 pawn equivalent</strong> To keep the thinks playable</li>
+            <li><strong>A maximum disadvantage/advantage of 1 pawn equivalent</strong> To keep it playable</li>
             <li><strong>Matériel limité :</strong> Maximum 22 points par côté</li>
             <li><strong>Fous de couleurs opposées :</strong> Chaque camp a au maximum 1 fou sur cases blanches et 1 sur cases noires</li>
         </ul>
@@ -554,18 +587,19 @@
         </p>
     </div>
 
-<div class="controls">
-    <!-- Évaluation Range -->
-    <div class="control-group">
-        <label>Évaluation (centipions):</label>
-        <div class="range-container">
-            <input type="range" id="targetMin" min="0" max="99" value="25" step="5" class="range-slider">
-            <input type="range" id="targetMax" min="0" max="99" value="100" step="5" class="range-slider">
-            <div class="range-values">
-                <span id="targetMinValue">25</span> - <span id="targetMaxValue">100</span> centipions
-            </div>
+<!-- Évaluation Range -->
+<div class="control-group">
+    <label>Évaluation (centipions):</label>
+    <div class="range-container">
+        <div style="position: relative;">
+            <input type="range" id="targetMin" min="0" max="99" value="25" step="5" class="range-slider range-slider-dual">
+            <input type="range" id="targetMax" min="0" max="99" value="100" step="5" class="range-slider range-slider-dual">
+        </div>
+        <div class="range-values">
+            From <span id="targetMinValue">-0.25</span> to <span id="targetMaxValue">+1.00</span>
         </div>
     </div>
+</div>
     
     <!-- Écart matériel -->
     <div class="control-group">
@@ -678,7 +712,7 @@ const materialDiffValue = document.getElementById('materialDiffValue');
 const maxMaterialSlider = document.getElementById('maxMaterial');
 const maxMaterialValue = document.getElementById('maxMaterialValue');
 
-// Update évaluation min/max
+// Update évaluation min/max avec conversion centipions
 targetMinSlider.addEventListener('input', () => {
     let min = parseInt(targetMinSlider.value);
     let max = parseInt(targetMaxSlider.value);
@@ -688,8 +722,15 @@ targetMinSlider.addEventListener('input', () => {
         max = min + 5;
     }
     
-    targetMinValue.textContent = min;
-    targetMaxValue.textContent = max;
+    // Conversion centipions en pawns et formatage
+    const minPawns = (min / 100).toFixed(2);
+    const maxPawns = (max / 100).toFixed(2);
+    
+    targetMinValue.textContent = minPawns > 0 ? `+${minPawns}` : minPawns;
+    targetMaxValue.textContent = maxPawns > 0 ? `+${maxPawns}` : maxPawns;
+    
+    // Mettre à jour les positions des curseurs pour la barre colorée
+    updateRangeTrack();
 });
 
 targetMaxSlider.addEventListener('input', () => {
@@ -701,9 +742,32 @@ targetMaxSlider.addEventListener('input', () => {
         min = max - 5;
     }
     
-    targetMinValue.textContent = min;
-    targetMaxValue.textContent = max;
+    // Conversion centipions en pawns et formatage
+    const minPawns = (min / 100).toFixed(2);
+    const maxPawns = (max / 100).toFixed(2);
+    
+    targetMinValue.textContent = minPawns > 0 ? `+${minPawns}` : minPawns;
+    targetMaxValue.textContent = maxPawns > 0 ? `+${maxPawns}` : maxPawns;
+    
+    // Mettre à jour les positions des curseurs pour la barre colorée
+    updateRangeTrack();
 });
+
+// Fonction pour mettre à jour la barre de progression colorée
+function updateRangeTrack() {
+    const min = parseInt(targetMinSlider.value);
+    const max = parseInt(targetMaxSlider.value);
+    const minPercent = (min / 99) * 100;
+    const maxPercent = (max / 99) * 100;
+    
+    targetMinSlider.style.setProperty('--min-percent', `${minPercent}%`);
+    targetMinSlider.style.setProperty('--max-percent', `${maxPercent}%`);
+    targetMaxSlider.style.setProperty('--min-percent', `${minPercent}%`);
+    targetMaxSlider.style.setProperty('--max-percent', `${maxPercent}%`);
+}
+
+// Initialiser l'affichage au chargement
+updateRangeTrack();
 
 // Update écart matériel
 materialDiffSlider.addEventListener('input', () => {
