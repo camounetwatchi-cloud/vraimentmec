@@ -205,6 +205,15 @@
         background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
     }
 
+    .action-btn.analysis {
+    background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+}
+
+.action-btn.analysis:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(76, 175, 80, 0.4);
+}
+
     .game-controls {
         display: flex;
         gap: 10px;
@@ -675,6 +684,9 @@
                 <div id="gameControls" class="game-controls" style="display: none;">
                     <button class="control-btn resign-btn" onclick="resign()">🏳️ Abandonner</button>
                     <button class="control-btn draw-btn" onclick="offerDraw()">🤝 Nulle</button>
+                    <button id="openLichessBtn" class="action-btn analysis" onclick="openOnLichess()">
+    📊 Ouvrir sur Lichess
+</button>
                 </div>
 
                 <div class="stats-grid">
@@ -1133,6 +1145,24 @@
             }
         }
 
+        function openOnLichess() {
+    if (gameMode !== 'analysis') {
+        alert('Cette fonctionnalité n\'est disponible qu\'en mode analyse');
+        return;
+    }
+    
+    // Récupérer la FEN actuelle
+    const fen = chessGame.fen();
+    
+    // Encoder la FEN pour l'URL (remplacer les espaces par des underscores)
+    const encodedFen = fen.replace(/ /g, '_');
+    
+    // Ouvrir Lichess dans un nouvel onglet
+    window.open(`https://lichess.org/analysis/standard/${encodedFen}`, '_blank');
+    
+    console.log('🔗 Position ouverte sur Lichess:', fen);
+}
+
         async function loadOnlinePlayers() {
             try {
                 const response = await fetch(`${API_URL}/api/players/online`, {
@@ -1422,7 +1452,7 @@ socket.on('challenge_accepted', (data) => {
             document.getElementById('playerInfo').style.display = 'flex';
             document.getElementById('turnIndicator').style.display = 'block';
             document.getElementById('gameControls').style.display = 'flex';
-            
+            document.getElementById('openLichessBtn').disabled = true;
             document.getElementById('createChallengeBtn').disabled = true;
             document.getElementById('reloadPositionBtn').disabled = true;
             document.getElementById('resetBoardBtn').disabled = true;
@@ -1672,6 +1702,7 @@ socket.on('challenge_accepted', (data) => {
             document.getElementById('createChallengeBtn').disabled = false;
             document.getElementById('reloadPositionBtn').disabled = false;
             document.getElementById('resetBoardBtn').disabled = false;
+            document.getElementById('openLichessBtn').disabled = false;
 
             clearHighlights();
             updateStatus('Choisissez une action pour commencer', 'waiting');
