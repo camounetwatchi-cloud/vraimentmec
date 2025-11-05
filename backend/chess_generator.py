@@ -62,11 +62,31 @@ except Exception as e:
 
 # --- Reste des fonctions (inchangées, sauf l'appel à l'engine) ---
 
-def generate_pieces_with_imbalance(max_material, material_diff):
-    """Génère une liste de pièces garantissant un déséquilibre matériel."""
+def generate_pieces_with_imbalance(max_material, material_diff, excluded_pieces=None):
+    """Génère une liste de pièces garantissant un déséquilibre matériel.
+    
+    Args:
+        max_material: Matériel maximum par côté
+        material_diff: Différence matérielle entre les camps
+        excluded_pieces: Liste des types de pièces à exclure (ex: ['queen', 'rook'])
+    """
+    if excluded_pieces is None:
+        excluded_pieces = []
+    
+    # Convertir les noms en types chess
+    piece_mapping = {
+        'queen': chess.QUEEN,
+        'rook': chess.ROOK,
+        'bishop': chess.BISHOP,
+        'knight': chess.KNIGHT,
+        'pawn': chess.PAWN
+    }
+    
+    excluded_types = [piece_mapping.get(p) for p in excluded_pieces if p in piece_mapping]
+    
     # Calculer les limites basées sur les paramètres
-    max_strong = min(max_material, 22)  # Ne jamais dépasser 22 (limite technique)
-    min_weak = max(10, max_strong - 6)  # Minimum 10 points
+    max_strong = min(max_material, 22)
+    min_weak = max(10, max_strong - 6)
     
     strong_side_material = random.randint(max_strong - 3, max_strong)
     
@@ -75,7 +95,6 @@ def generate_pieces_with_imbalance(max_material, material_diff):
     else:
         weak_side_material = strong_side_material - random.randint(material_diff, min(material_diff + 2, 6))
     
-    # S'assurer que le côté faible a au moins 10 points
     weak_side_material = max(weak_side_material, 10)
     
     pieces_strong = []
@@ -84,9 +103,24 @@ def generate_pieces_with_imbalance(max_material, material_diff):
     for pieces_list, target_material in [(pieces_strong, strong_side_material), 
                                          (pieces_weak, weak_side_material)]:
         current = 0
-        available = [chess.QUEEN, chess.ROOK, chess.ROOK, chess.BISHOP, chess.BISHOP,
-                     chess.KNIGHT, chess.KNIGHT, chess.PAWN, chess.PAWN, chess.PAWN,
-                     chess.PAWN, chess.PAWN, chess.PAWN]
+        # Créer la liste des pièces disponibles en excluant celles filtrées
+        available = []
+        
+        if chess.QUEEN not in excluded_types:
+            available.append(chess.QUEEN)
+        if chess.ROOK not in excluded_types:
+            available.extend([chess.ROOK, chess.ROOK])
+        if chess.BISHOP not in excluded_types:
+            available.extend([chess.BISHOP, chess.BISHOP])
+        if chess.KNIGHT not in excluded_types:
+            available.extend([chess.KNIGHT, chess.KNIGHT])
+        if chess.PAWN not in excluded_types:
+            available.extend([chess.PAWN] * 6)
+        
+        # Si aucune pièce n'est disponible, lever une erreur
+        if not available:
+            raise ValueError("Impossible de générer une position : toutes les pièces sont exclues")
+        
         random.shuffle(available)
         
         for piece in available:
@@ -103,8 +137,14 @@ def get_square_color(square: chess.Square) -> bool:
     """Détermine la couleur de la case."""
     return (chess.square_rank(square) + chess.square_file(square)) % 2 == 0
 
-def generate_optimized_random_fen(max_material, material_diff):
-    """Génère une FEN avec déséquilibre matériel intégré."""
+def generate_optimized_random_fen(max_material, material_diff, excluded_pieces=None):
+    """Génère une FEN avec déséquilibre matériel intégré.
+    
+    Args:
+        max_material: Matériel maximum par côté
+        material_diff: Différence matérielle
+        excluded_pieces: Liste des pièces à exclure
+    """
     board = chess.Board(None)
     
     king_squares = random.sample(chess.SQUARES, 2)
@@ -117,7 +157,7 @@ def generate_optimized_random_fen(max_material, material_diff):
     available_squares = list(set(chess.SQUARES) - set(king_squares))
     random.shuffle(available_squares)
     
-    pieces_strong, pieces_weak = generate_pieces_with_imbalance(max_material, material_diff)
+    pieces_strong, pieces_weak = generate_pieces_with_imbalance(max_material, material_diff, excluded_pieces)
     
     if random.choice([True, False]):
         white_pieces, black_pieces = pieces_strong, pieces_weak
@@ -269,7 +309,7 @@ def get_stockfish_evaluation_batch(fens: list):
 
     return results
 
-def generate_fen_position(target_min=25, target_max=100, material_diff=3, max_material=22, max_attempts=20000):
+def generate_fen_position(target_min=25, target_max=100, material_diff=3, max_material=22, max_attempts=20000, excluded_pieces=None):
     """Fonction principale appelée par l'API
     
     Args:
@@ -278,6 +318,7 @@ def generate_fen_position(target_min=25, target_max=100, material_diff=3, max_ma
         material_diff: Différence matérielle minimum (0-6)
         max_material: Matériel maximum par côté (10-25)
         max_attempts: Nombre maximum de tentatives
+        excluded_pieces: Liste des types de pièces à exclure (['queen', 'rook', etc.])
     """
     global engine
     start_time = time.time()
@@ -298,17 +339,19 @@ def generate_fen_position(target_min=25, target_max=100, material_diff=3, max_ma
     if max_material < 10 or max_material > 25:
         raise ValueError("max_material doit être entre 10 et 25")
     
+    if excluded_pieces is None:
+        excluded_pieces = []
+    
     try:
         BATCH_SIZE = 5
         candidates_buffer = []
         
-        # Définir MIN_PIECE_DIFFERENCE selon material_diff
         min_piece_diff = 1 if material_diff >= 2 else 0
         
         while tentatives < max_attempts:
             tentatives += 1
             
-            fen, board = generate_optimized_random_fen(max_material, material_diff)
+            fen, board = generate_optimized_random_fen(max_material, material_diff, excluded_pieces)
             is_legal, board = is_fen_legal((fen, board))
             
             if not is_legal:
