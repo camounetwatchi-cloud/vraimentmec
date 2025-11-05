@@ -257,7 +257,7 @@ def get_stockfish_evaluation_batch(fens: list):
 
     return results
 
-def generate_fen_position(target_min=25, target_max=100, max_attempts=20000):
+def generate_fen_position(target_min=10, target_max=75, max_attempts=20000):
     """Fonction principale appelée par l'API"""
     global engine
     start_time = time.time()
