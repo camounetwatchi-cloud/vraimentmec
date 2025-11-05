@@ -37,11 +37,50 @@
         }
 
         .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.control-full-width {
+    width: 100%;
+}
+
+.control-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+
+.control-row label {
+    min-width: 180px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.control-row .range-container {
+    flex: 1;
+    min-width: 200px;
+}
+
+.control-row .range-values {
+    min-width: 140px;
+    text-align: right;
+    margin-top: 0;
+    flex-shrink: 0;
+}
+
+.control-row-split {
+    display: flex;
+    gap: 15px;
+    width: 100%;
+}
+
+.control-half {
+    flex: 1;
+}
 
         .control-group {
             display: flex;
@@ -410,14 +449,6 @@
     z-index: 3;
 }
 
-.range-values {
-    text-align: center;
-    font-weight: 600;
-    color: #667eea;
-    margin-top: 8px;
-    font-size: 1.1em;
-}
-
 .control-group label {
     display: flex;
     justify-content: space-between;
@@ -587,30 +618,52 @@
         </p>
     </div>
 
-<!-- Évaluation Range -->
-<div class="control-group">
-    <label>Évaluation (centipions):</label>
-    <div class="range-container">
-        <div style="position: relative;">
-            <input type="range" id="targetMin" min="0" max="99" value="25" step="5" class="range-slider range-slider-dual">
-            <input type="range" id="targetMax" min="0" max="99" value="100" step="5" class="range-slider range-slider-dual">
-        </div>
-        <div class="range-values">
-            From <span id="targetMinValue">-0.25</span> to <span id="targetMaxValue">+1.00</span>
+<div class="controls">
+    <!-- Évaluation Range -->
+    <div class="control-group control-full-width">
+        <div class="control-row">
+            <label>Évaluation (centipions):</label>
+            <div class="range-container">
+                <div style="position: relative;">
+                    <input type="range" id="targetMin" min="0" max="99" value="25" step="5" class="range-slider range-slider-dual">
+                    <input type="range" id="targetMax" min="0" max="99" value="100" step="5" class="range-slider range-slider-dual">
+                </div>
+            </div>
+            <div class="range-values">
+                From <span id="targetMinValue">-0.25</span> to <span id="targetMaxValue">+1.00</span>
+            </div>
         </div>
     </div>
-</div>
     
-    <!-- Écart matériel -->
-    <div class="control-group">
-        <label for="materialDiff">Écart matériel minimum: <span id="materialDiffValue">3</span></label>
-        <input type="range" id="materialDiff" min="0" max="6" value="3" step="1" class="range-slider">
-    </div>
-    
-    <!-- Matériel max -->
-    <div class="control-group">
-        <label for="maxMaterial">Matériel max par côté: <span id="maxMaterialValue">22</span></label>
-        <input type="range" id="maxMaterial" min="10" max="25" value="22" step="1" class="range-slider">
+    <!-- Écart matériel et Matériel max sur la même ligne -->
+    <div class="control-group control-full-width">
+        <div class="control-row-split">
+            <!-- Écart matériel -->
+            <div class="control-half">
+                <div class="control-row">
+                    <label for="materialDiff">Écart matériel min:</label>
+                    <div class="range-container">
+                        <input type="range" id="materialDiff" min="0" max="6" value="3" step="1" class="range-slider">
+                    </div>
+                    <div class="range-values">
+                        <span id="materialDiffValue">3</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Matériel max -->
+            <div class="control-half">
+                <div class="control-row">
+                    <label for="maxMaterial">Matériel max/côté:</label>
+                    <div class="range-container">
+                        <input type="range" id="maxMaterial" min="10" max="25" value="22" step="1" class="range-slider">
+                    </div>
+                    <div class="range-values">
+                        <span id="maxMaterialValue">22</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <!-- Tentatives (garder en input classique) -->
