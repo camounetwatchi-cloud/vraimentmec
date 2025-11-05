@@ -188,7 +188,7 @@ class Game:
         if player_color != self.board.turn:
             raise ValueError("Ce n'est pas votre tour de jouer.")
 
-        try:
+try:
             # Créer l'objet mouvement à partir de la chaîne UCI
             move = chess.Move.from_uci(uci_move)
             
@@ -198,26 +198,27 @@ class Game:
 
             # Effectuer le mouvement
             self.board.push(move)
+            
             # Mise à jour du temps
-now = datetime.now()
-elapsed = (now - self.last_move_time).total_seconds()
+            now = datetime.now()
+            elapsed = (now - self.last_move_time).total_seconds()
 
-if player_color == chess.WHITE:
-    self.white_time -= elapsed
-    self.white_time += self.increment
-    if self.white_time <= 0:
-        status = 'timeout'
-        result = 'black_win'
-        winner = self.get_player_info(self.get_opponent_id(player_sid))['username']
-else:
-    self.black_time -= elapsed
-    self.black_time += self.increment
-    if self.black_time <= 0:
-        status = 'timeout'
-        result = 'white_win'
-        winner = self.get_player_info(self.get_opponent_id(player_sid))['username']
+            if player_color == chess.WHITE:
+                self.white_time -= elapsed
+                self.white_time += self.increment
+                if self.white_time <= 0:
+                    status = 'timeout'
+                    result = 'black_win'
+                    winner = self.get_player_info(self.get_opponent_id(player_sid))['username']
+            else:
+                self.black_time -= elapsed
+                self.black_time += self.increment
+                if self.black_time <= 0:
+                    status = 'timeout'
+                    result = 'white_win'
+                    winner = self.get_player_info(self.get_opponent_id(player_sid))['username']
 
-self.last_move_time = now
+            self.last_move_time = now
             self.moves_history.append(uci_move)
             
             # Déterminer le statut de la partie
