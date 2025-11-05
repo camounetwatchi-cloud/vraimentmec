@@ -275,9 +275,10 @@
     transform: translateY(-50%);
     background: white;
     border-radius: 15px;
-    padding: 20px;
+    padding: 15px 10px
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     z-index: 100;
+    width: 50px;
 }
 
 .filters-title {
@@ -479,7 +480,7 @@
 <body>
     <!-- Panneau de filtrage des pièces -->
     <div class="filters-container">
-        <div class="filters-title">🎯 Filtrer les pièces</div>
+        <div class="filters-title">Choose your pieces</div>
         <div class="pieces-filter">
             <div class="piece-filter-item" data-piece="queen" title="Dame">
                 ♕
@@ -497,9 +498,6 @@
                 ♙
             </div>
         </div>
-        <button class="reset-filters-btn" onclick="resetFilters()">
-            🔄 Réinitialiser
-        </button>
     </div>
 
     <!-- Le reste du contenu existant -->
