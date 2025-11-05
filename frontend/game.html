@@ -469,6 +469,29 @@
         background: white;
         padding: 8px;
         border-radius: 4px;
+
+        .lichess-mini-btn {
+    padding: 6px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 600;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.lichess-mini-btn:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+}
+
+.lichess-mini-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
     }
 
     .mode-indicator {
@@ -684,9 +707,6 @@
                 <div id="gameControls" class="game-controls" style="display: none;">
                     <button class="control-btn resign-btn" onclick="resign()">🏳️ Abandonner</button>
                     <button class="control-btn draw-btn" onclick="offerDraw()">🤝 Nulle</button>
-                    <button id="openLichessBtn" class="action-btn analysis" onclick="openOnLichess()">
-    📊 Ouvrir sur Lichess
-</button>
                 </div>
 
                 <div class="stats-grid">
@@ -709,10 +729,16 @@
             <!-- Center: Chessboard -->
             <div class="board-container">
                 <!-- Position Info -->
-                <div class="position-info">
-                    <div class="position-info-title">Position actuelle:</div>
-                    <div class="position-info-fen" id="currentFen">2b5/4pQ2/pkp2b1p/6p1/3p4/6n1/3KR1r1/8 w - - 0 24</div>
-                </div>
+                <!-- Position Info -->
+<div class="position-info">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div class="position-info-title" style="margin-bottom: 0;">Position actuelle:</div>
+        <button id="openLichessBtn" class="lichess-mini-btn" onclick="openOnLichess()" title="Ouvrir sur Lichess">
+            📊 Lichess
+        </button>
+    </div>
+    <div class="position-info-fen" id="currentFen">2b5/4pQ2/pkp2b1p/6p1/3p4/6n1/3KR1r1/8 w - - 0 24</div>
+</div>
 
                 <div id="opponentInfo" class="player-info" style="display: none;">
     <div>
@@ -1452,7 +1478,9 @@ socket.on('challenge_accepted', (data) => {
             document.getElementById('playerInfo').style.display = 'flex';
             document.getElementById('turnIndicator').style.display = 'block';
             document.getElementById('gameControls').style.display = 'flex';
-            document.getElementById('openLichessBtn').disabled = true;
+            // Désactiver le bouton Lichess en mode partie
+            const lichessBtn = document.getElementById('openLichessBtn');
+            if (lichessBtn) lichessBtn.disabled = true;
             document.getElementById('createChallengeBtn').disabled = true;
             document.getElementById('reloadPositionBtn').disabled = true;
             document.getElementById('resetBoardBtn').disabled = true;
@@ -1702,7 +1730,8 @@ socket.on('challenge_accepted', (data) => {
             document.getElementById('createChallengeBtn').disabled = false;
             document.getElementById('reloadPositionBtn').disabled = false;
             document.getElementById('resetBoardBtn').disabled = false;
-            document.getElementById('openLichessBtn').disabled = false;
+            const lichessBtn = document.getElementById('openLichessBtn');
+            if (lichessBtn) lichessBtn.disabled = false;
 
             clearHighlights();
             updateStatus('Choisissez une action pour commencer', 'waiting');
