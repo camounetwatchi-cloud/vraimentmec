@@ -869,22 +869,25 @@
         };
 
         window.addEventListener('load', async () => {
-            await checkNavAuthentication();
-            initializeBoard();
-            loadPosition(currentFen);
-            connectWebSocket();
-            
-            await setPlayerOnline();
-            
-            document.getElementById('reloadPositionBtn').addEventListener('click', reloadPosition);
-            document.getElementById('createChallengeBtn').addEventListener('click', openChallengeModal);
-            
-            loadOnlinePlayers();
-            loadChallenges();
-            
-            setInterval(loadOnlinePlayers, 5000);
-            setInterval(loadChallenges, 3000);
-        });
+    await checkNavAuthentication();
+    initializeBoard();
+    
+    // Charger une position aléatoire au démarrage
+    await loadRandomPositionOnStart();
+    
+    connectWebSocket();
+    
+    await setPlayerOnline();
+    
+    document.getElementById('reloadPositionBtn').addEventListener('click', reloadPosition);
+    document.getElementById('createChallengeBtn').addEventListener('click', openChallengeModal);
+    
+    loadOnlinePlayers();
+    loadChallenges();
+    
+    setInterval(loadOnlinePlayers, 5000);
+    setInterval(loadChallenges, 3000);
+});
 
         window.addEventListener('beforeunload', async () => {
             await setPlayerOffline();
@@ -1170,6 +1173,31 @@
                 btn.textContent = '🔄 Nouvelle position';
             }
         }
+
+        async function loadRandomPositionOnStart() {
+    try {
+        const response = await fetch(`${API_URL}/api/random-position`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            loadPosition(data.data.fen);
+            updateStatus('✅ Position aléatoire chargée', 'playing');
+            console.log('📊 Position de départ:', data.data);
+        } else {
+            // Si erreur, charger la position par défaut
+            console.warn('⚠️ Impossible de charger position aléatoire, utilisation de la position par défaut');
+            loadPosition(currentFen);
+        }
+    } catch (error) {
+        console.error('❌ Erreur chargement position initiale:', error);
+        // En cas d'erreur, charger la position par défaut
+        loadPosition(currentFen);
+    }
+}
 
         function openOnLichess() {
     if (gameMode !== 'analysis') {
