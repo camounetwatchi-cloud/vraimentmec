@@ -292,6 +292,141 @@ def handle_connect():
     print(f"✅ Client connecté: {request.sid}")
     emit('connection_established', {'sid': request.sid, 'async_mode': socketio.async_mode})
 
+@socketio.on('join_game')
+def handle_join_game(data):
+    """Permet aux joueurs de rejoindre une partie créée"""
+    try:
+        game_id = data.get('game_id')
+        user_id = session.get('user_id')
+        
+        if not game_id or not user_id:
+            emit('error', {'message': 'game_id et authentification requis'})
+            return
+        
+        # Vérifier si la partie existe déjà
+        if game_id in games:
+            game = games[game_id]
+            print(f"✅ Joueur {user_id} rejoint la partie existante {game_id}")
+            join_room(game_id, sid=request.sid)
+            
+            emit('game_joined', {
+                'game_id': game_id,
+                'color': game.get_player_color(request.sid),
+                'fen': game.fen,
+                'opponent': {
+                    'username': game.get_opponent_id(request.sid)
+                }
+            })
+            return
+        
+        # Sinon, chercher dans les parties en attente
+        if not hasattr(app, 'pending_games') or game_id not in app.pending_games:
+            emit('error', {'message': 'Partie introuvable'})
+            return
+        
+        game_info = app.pending_games[game_id]
+        
+        # Vérifier que l'utilisateur fait partie de cette partie
+        if user_id not in [game_info['challenger_id'], game_info['accepter_id']]:
+            emit('error', {'message': 'Vous ne faites pas partie de cette partie'})
+            return
+        
+        # Enregistrer le SID pour cet utilisateur
+        if 'sids' not in game_info:
+            game_info['sids'] = {}
+        
+        game_info['sids'][user_id] = request.sid
+        
+        print(f"✅ {user_id} connecté avec SID {request.sid} pour la partie {game_id}")
+        
+        # Si les deux joueurs sont connectés, créer l'objet Game
+        if len(game_info['sids']) == 2:
+            from backend.socket_manager import Game
+            
+            challenger_sid = game_info['sids'][game_info['challenger_id']]
+            accepter_sid = game_info['sids'][game_info['accepter_id']]
+            
+            # Créer la partie avec les bons SIDs et couleurs
+            game = Game.__new__(Game)
+            game.game_id = game_id
+            game.board = chess.Board(game_info['fen'])
+            game.starting_fen = game_info['fen']
+            game.moves_history = []
+            game.started_at = game_info['created']
+            
+            from backend.db_models import User
+            game.user1 = User.query.get(game_info['challenger_id'])
+            game.user2 = User.query.get(game_info['accepter_id'])
+            
+            # Assigner les couleurs
+            if game_info['challenger_color'] == 'white':
+                game.players = {
+                    challenger_sid: {
+                        'color': chess.WHITE,
+                        'user_id': game_info['challenger_id'],
+                        'username': game_info['challenger_name']
+                    },
+                    accepter_sid: {
+                        'color': chess.BLACK,
+                        'user_id': game_info['accepter_id'],
+                        'username': game_info['accepter_name']
+                    }
+                }
+            else:
+                game.players = {
+                    challenger_sid: {
+                        'color': chess.BLACK,
+                        'user_id': game_info['challenger_id'],
+                        'username': game_info['challenger_name']
+                    },
+                    accepter_sid: {
+                        'color': chess.WHITE,
+                        'user_id': game_info['accepter_id'],
+                        'username': game_info['accepter_name']
+                    }
+                }
+            
+            join_room(game_id, sid=challenger_sid)
+            join_room(game_id, sid=accepter_sid)
+            
+            games[game_id] = game
+            del app.pending_games[game_id]
+            
+            print(f"✅ Partie {game_id} complètement initialisée avec les deux joueurs")
+            
+            # Envoyer game_start aux deux joueurs
+            emit('game_start', {
+                'game_id': game_id,
+                'color': game.get_player_color(challenger_sid),
+                'fen': game.fen,
+                'time_control': game_info.get('time_control'),
+                'opponent': {
+                    'username': game_info['accepter_name']
+                }
+            }, room=challenger_sid)
+            
+            emit('game_start', {
+                'game_id': game_id,
+                'color': game.get_player_color(accepter_sid),
+                'fen': game.fen,
+                'time_control': game_info.get('time_control'),
+                'opponent': {
+                    'username': game_info['challenger_name']
+                }
+            }, room=accepter_sid)
+        else:
+            # Un seul joueur connecté, attendre l'autre
+            emit('game_joined', {
+                'game_id': game_id,
+                'status': 'waiting_opponent'
+            })
+    
+    except Exception as e:
+        print(f"❌ Erreur dans join_game: {e}")
+        import traceback
+        traceback.print_exc()
+        emit('error', {'message': 'Erreur lors de la connexion à la partie'})
+
 @socketio.on('disconnect')
 def handle_disconnect():
     print(f"❌ Client déconnecté: {request.sid}")
@@ -712,18 +847,57 @@ def accept_challenge(challenge_id):
         print(f"   Accepteur: {user.username}")
         print(f"   Cadence: {challenge['time_control']['minutes']}+{challenge['time_control']['increment']}")
         
-        del challenges[challenge_id]
-        
-        socketio.emit('challenge_accepted', {
-            'challenge_id': challenge_id,
-            'game_id': game_id,
-            'challenger_id': challenge['challenger_id'],
-            'accepter_id': user_id,
-            'challenger_name': challenger.username,
-            'accepter_name': user.username,
-            'fen': challenge['fen'],
-            'time_control': challenge['time_control']
-        })
+       del challenges[challenge_id]
+
+# CRÉER RÉELLEMENT LA PARTIE DANS LE GESTIONNAIRE
+from backend.socket_manager import Game, games
+import random
+
+# Attribution aléatoire des couleurs
+colors = ['white', 'black']
+challenger_color = random.choice(colors)
+accepter_color = 'black' if challenger_color == 'white' else 'white'
+
+# On ne peut pas utiliser les SIDs ici car on est en HTTP, pas en WebSocket
+# On va créer la partie et l'associer aux user_ids
+# Les SIDs seront associés via WebSocket quand les joueurs se connecteront
+
+# Créer un mapping temporaire pour retrouver la partie
+game_info = {
+    'game_id': game_id,
+    'challenger_id': challenge['challenger_id'],
+    'accepter_id': user_id,
+    'challenger_color': challenger_color,
+    'accepter_color': accepter_color,
+    'fen': challenge['fen'],
+    'time_control': challenge['time_control'],
+    'challenger_name': challenger.username,
+    'accepter_name': user.username,
+    'created': datetime.utcnow()
+}
+
+# Stocker temporairement les infos de la partie
+# (sera converti en objet Game quand les joueurs se connecteront via WebSocket)
+if not hasattr(app, 'pending_games'):
+    app.pending_games = {}
+app.pending_games[game_id] = game_info
+
+print(f"✅ Partie créée en attente: {game_id}")
+print(f"   {challenger.username} ({challenger_color}) vs {user.username} ({accepter_color})")
+print(f"   Cadence: {challenge['time_control']['minutes']}+{challenge['time_control']['increment']}")
+
+socketio.emit('challenge_accepted', {
+    'challenge_id': challenge_id,
+    'game_id': game_id,
+    'challenger_id': challenge['challenger_id'],
+    'accepter_id': user_id,
+    'challenger_name': challenger.username,
+    'accepter_name': user.username,
+    'challenger_color': challenger_color,
+    'accepter_color': accepter_color,
+    'fen': challenge['fen'],
+    'time_control': challenge['time_control']
+})
         
         return jsonify({
             'success': True,
