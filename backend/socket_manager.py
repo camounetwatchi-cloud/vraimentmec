@@ -213,7 +213,7 @@ class Game:
                 status = 'draw_insufficient'
                 result = 'draw'
                 
-elif self.board.can_claim_fifty_moves():
+            elif self.board.can_claim_fifty_moves():
                 status = 'draw_50_moves'
                 result = 'draw'
                 
