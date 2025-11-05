@@ -255,6 +255,8 @@ self.last_move_time = now
                 self.save_to_database(result)
             
             return self.board.fen(), status, {
+                'white_time': self.white_time,
+'                black_time': self.black_time
                 'moves_count': len(self.moves_history),
                 'last_move': uci_move,
                 'result': result,
