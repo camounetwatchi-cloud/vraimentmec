@@ -570,6 +570,18 @@ header {
     transition: all 0.3s;
 }
 
+.range-slider {
+    pointer-events: none;
+}
+
+.range-slider::-webkit-slider-thumb {
+    pointer-events: all;
+}
+
+.range-slider::-moz-range-thumb {
+    pointer-events: all;
+}
+
 .control-group label {
     display: flex;
     justify-content: space-between;
@@ -753,22 +765,36 @@ header {
     <!-- Évaluation Range -->
 <div class="control-group control-full-width">
     <label>Évaluation (en pions):</label>
-    <div class="range-values-top" style="display: flex; justify-content: space-around; margin-bottom: 15px;">
-        <div style="text-align: center;">
-            <small style="color: #999;">Désavantage blanc</small><br>
-            From <span id="negativeMinValue">-0.99</span> to <span id="negativeMaxValue">-0.15</span>
+    
+    <!-- Range négatif -->
+    <div style="margin-bottom: 25px;">
+        <div style="text-align: center; margin-bottom: 10px;">
+            <small style="color: #999;">Désavantage blanc: de </small>
+            <span id="negativeMinValue" style="color: #f44336; font-weight: 600;">-0.99</span>
+            <small style="color: #999;"> à </small>
+            <span id="negativeMaxValue" style="color: #f44336; font-weight: 600;">-0.15</span>
         </div>
-        <div style="text-align: center;">
-            <small style="color: #999;">Avantage blanc</small><br>
-            From <span id="positiveMinValue">+0.15</span> to <span id="positiveMaxValue">+0.99</span>
+        <div class="range-container" style="position: relative; height: 40px;">
+            <input type="range" id="negativeMin" min="-99" max="-15" value="-99" step="1" 
+                   class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+            <input type="range" id="negativeMax" min="-99" max="-15" value="-15" step="1" 
+                   class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
         </div>
     </div>
-    <div class="range-container">
-        <div style="position: relative;">
-            <input type="range" id="negativeMin" min="-99" max="-15" value="-99" step="1" class="range-slider range-slider-quad">
-            <input type="range" id="negativeMax" min="-99" max="-15" value="-15" step="1" class="range-slider range-slider-quad">
-            <input type="range" id="positiveMin" min="15" max="99" value="15" step="1" class="range-slider range-slider-quad">
-            <input type="range" id="positiveMax" min="15" max="99" value="99" step="1" class="range-slider range-slider-quad">
+    
+    <!-- Range positif -->
+    <div>
+        <div style="text-align: center; margin-bottom: 10px;">
+            <small style="color: #999;">Avantage blanc: de </small>
+            <span id="positiveMinValue" style="color: #4caf50; font-weight: 600;">+0.15</span>
+            <small style="color: #999;"> à </small>
+            <span id="positiveMaxValue" style="color: #4caf50; font-weight: 600;">+0.99</span>
+        </div>
+        <div class="range-container" style="position: relative; height: 40px;">
+            <input type="range" id="positiveMin" min="15" max="99" value="15" step="1" 
+                   class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+            <input type="range" id="positiveMax" min="15" max="99" value="99" step="1" 
+                   class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
         </div>
     </div>
 </div>
