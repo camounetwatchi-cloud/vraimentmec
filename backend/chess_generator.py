@@ -313,8 +313,10 @@ def generate_fen_position(negative_min=-99, negative_max=-15, positive_min=15, p
     """Fonction principale appelée par l'API
     
     Args:
-        target_min: Évaluation minimum en centipions (0-99)
-        target_max: Évaluation maximum en centipions (1-99)
+        negative_min: Évaluation négative minimum en centipions (-99 à -15)
+        negative_max: Évaluation négative maximum en centipions (-99 à -15)
+        positive_min: Évaluation positive minimum en centipions (15 à 99)
+        positive_max: Évaluation positive maximum en centipions (15 à 99)
         material_diff: Différence matérielle minimum (0-6)
         max_material: Matériel maximum par côté (10-25)
         max_attempts: Nombre maximum de tentatives
@@ -328,12 +330,18 @@ def generate_fen_position(negative_min=-99, negative_max=-15, positive_min=15, p
         raise Exception(f"Le moteur Stockfish n'est pas initialisé. Chemin: {STOCKFISH_PATH}")
     
     # Validation des paramètres
-    if target_min < 0 or target_min > 99:
-        raise ValueError("target_min doit être entre 0 et 99")
-    if target_max < 1 or target_max > 99:
-        raise ValueError("target_max doit être entre 1 et 99")
-    if target_min >= target_max:
-        raise ValueError("target_min doit être inférieur à target_max")
+if negative_min < -99 or negative_min > -15:
+    raise ValueError("negative_min doit être entre -99 et -15")
+if negative_max < -99 or negative_max > -15:
+    raise ValueError("negative_max doit être entre -99 et -15")
+if negative_min > negative_max:
+    raise ValueError("negative_min doit être inférieur à negative_max")
+if positive_min < 15 or positive_min > 99:
+    raise ValueError("positive_min doit être entre 15 et 99")
+if positive_max < 15 or positive_max > 99:
+    raise ValueError("positive_max doit être entre 15 et 99")
+if positive_min > positive_max:
+    raise ValueError("positive_min doit être inférieur à positive_max")
     if material_diff < 0 or material_diff > 6:
         raise ValueError("material_diff doit être entre 0 et 6")
     if max_material < 10 or max_material > 25:
