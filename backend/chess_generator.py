@@ -390,4 +390,4 @@ def generate_fen_position(negative_min=-99, negative_max=-15, positive_min=15, p
         raise Exception("Position non trouvée après maximum de tentatives")
     
     finally:
-    pass
+        pass
