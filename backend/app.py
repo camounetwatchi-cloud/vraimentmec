@@ -317,16 +317,17 @@ def generate_position():
                     'success': False,
                     'error': f'Pièce invalide: {piece}'
                 }), 400
+                
         result = generate_fen_position(
-    negative_min,
-    negative_max,
-    positive_min,
-    positive_max,
-    material_diff, 
-    max_material, 
-    max_attempts,
-    excluded_pieces
-)
+            negative_min=negative_min,
+            negative_max=negative_max,
+            positive_min=positive_min,
+            positive_max=positive_max,
+            material_diff=material_diff,
+            max_material=max_material,
+            max_attempts=max_attempts,
+            excluded_pieces=excluded_pieces
+        )
         
         return jsonify({
             'success': True,
