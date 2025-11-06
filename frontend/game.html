@@ -3,6 +3,7 @@
 <head>
     <link rel="stylesheet" href="navbar.css">
     <link rel="stylesheet" href="global.css">  <!-- AJOUTER EN PREMIER -->
+    <link rel="stylesheet" href="chesspieces.css">  <!-- AJOUTER CETTE LIGNE -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jeu d'Échecs en Ligne</title>
@@ -92,15 +93,6 @@
 
     .square.check {
         background-color: rgba(255, 0, 0, 0.5) !important;
-    }
-
-    .piece {
-        cursor: grab;
-        user-select: none;
-    }
-
-    .piece:active {
-        cursor: grabbing;
     }
 
     .player-info {
@@ -1068,34 +1060,51 @@
         }
 
         function renderBoard() {
-            const squares = document.querySelectorAll('.square');
-            const boardArray = chessGame.board();
+    const squares = document.querySelectorAll('.square');
+    const boardArray = chessGame.board();
+    
+    squares.forEach((square, index) => {
+        const row = Math.floor(index / 8);
+        const col = index % 8;
+        
+        let displayRow = row;
+        let displayCol = col;
+        
+        if (gameMode === 'game' && playerColor === 'black') {
+            displayRow = 7 - row;
+            displayCol = 7 - col;
+        }
+        
+        const piece = boardArray[displayRow][displayCol];
+        
+        square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+        
+        // *** MODIFICATION ICI ***
+        if (piece) {
+            const pieceSymbol = piece.type.toUpperCase();
+            const pieceColor = piece.color === 'w' ? pieceSymbol : pieceSymbol.toLowerCase();
             
-            squares.forEach((square, index) => {
-                const row = Math.floor(index / 8);
-                const col = index % 8;
-                
-                let displayRow = row;
-                let displayCol = col;
-                
-                if (gameMode === 'game' && playerColor === 'black') {
-                    displayRow = 7 - row;
-                    displayCol = 7 - col;
-                }
-                
-                const piece = boardArray[displayRow][displayCol];
-                
-                square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
-                
-                if (piece) {
-                    const pieceSymbol = piece.type.toUpperCase();
-                    const pieceColor = piece.color === 'w' ? pieceSymbol : pieceSymbol.toLowerCase();
-                    square.textContent = PIECES[pieceColor] || '';
-                    square.classList.add('piece');
-                } else {
-                    square.textContent = '';
-                }
-            });
+            // Créer une div pour la pièce au lieu d'utiliser textContent
+            const pieceDiv = document.createElement('div');
+            pieceDiv.className = `chess-piece piece-${pieceColor}`;
+            square.innerHTML = ''; // Vider le contenu
+            square.appendChild(pieceDiv);
+        } else {
+            square.innerHTML = '';
+        }
+    });
+    
+    if (chessGame.in_check()) {
+        const turn = chessGame.turn();
+        const kingSquare = findKingSquare(turn);
+        if (kingSquare) {
+            const square = document.querySelector(`[data-row="${kingSquare.row}"][data-col="${kingSquare.col}"]`);
+            if (square) square.classList.add('check');
+        }
+    }
+    
+    console.log('✅ Échiquier rendu');
+}
             
             if (chessGame.in_check()) {
                 const turn = chessGame.turn();
