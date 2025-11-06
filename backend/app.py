@@ -239,7 +239,6 @@ def generate_position():
         data = request.get_json()
         
         # Récupérer les paramètres avec valeurs par défaut
-        # Récupérer les paramètres avec valeurs par défaut
         negative_min = data.get('negative_min', -99)
         negative_max = data.get('negative_max', -15)
         positive_min = data.get('positive_min', 15)
@@ -247,25 +246,43 @@ def generate_position():
         material_diff = data.get('material_diff', 3)
         max_material = data.get('max_material', 22)
         max_attempts = data.get('max_attempts', 20000)
-        excluded_pieces = data.get('excluded_pieces', [])  # AJOUTER CETTE LIGNE
+        excluded_pieces = data.get('excluded_pieces', [])
         
         # Validations
-        if target_min < 0 or target_min > 99:
+        if negative_min < -99 or negative_min > -15:
             return jsonify({
                 'success': False,
-                'error': 'target_min doit être entre 0 et 99'
+                'error': 'negative_min doit être entre -99 et -15'
             }), 400
         
-        if target_max < 1 or target_max > 99:
+        if negative_max < -99 or negative_max > -15:
             return jsonify({
                 'success': False,
-                'error': 'target_max doit être entre 1 et 99'
+                'error': 'negative_max doit être entre -99 et -15'
             }), 400
         
-        if target_min >= target_max:
+        if negative_min > negative_max:
             return jsonify({
                 'success': False,
-                'error': 'target_min doit être inférieur à target_max'
+                'error': 'negative_min doit être inférieur à negative_max'
+            }), 400
+        
+        if positive_min < 15 or positive_min > 99:
+            return jsonify({
+                'success': False,
+                'error': 'positive_min doit être entre 15 et 99'
+            }), 400
+        
+        if positive_max < 15 or positive_max > 99:
+            return jsonify({
+                'success': False,
+                'error': 'positive_max doit être entre 15 et 99'
+            }), 400
+        
+        if positive_min > positive_max:
+            return jsonify({
+                'success': False,
+                'error': 'positive_min doit être inférieur à positive_max'
             }), 400
         
         if material_diff < 0 or material_diff > 6:
@@ -300,8 +317,6 @@ def generate_position():
                     'success': False,
                     'error': f'Pièce invalide: {piece}'
                 }), 400
-        
-        # MODIFIER L'APPEL À LA FONCTION
         result = generate_fen_position(
     negative_min,
     negative_max,
