@@ -359,16 +359,12 @@ header {
         /* Ajouter après le style .info-box p */
 
 .filters-container {
-    position: fixed;
-    left: 20px;
-    top: 50%;
-    transform: translateY(-50%);
     background: white;
     border-radius: 15px;
     padding: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    z-index: 100;
     width: 150px;
+    margin-top: 20px;
 }
 
 .filters-title {
@@ -533,6 +529,9 @@ header {
 
 /* Responsive - masquer sur petits écrans */
 @media (max-width: 1200px) {
+    .main-content {
+        flex-direction: column;
+    }
     .filters-container {
         position: static;
         transform: none;
@@ -658,7 +657,11 @@ header {
     </button>
 </header>
 
-        <main>
+    <div class="main-content" style="display: flex; gap: 20px; align-items: flex-start;">
+       
+        <!-- Contrôles à droite -->
+        <div class="generator-controls" style="flex: 1;">
+            <div class="controls">
     <div id="infoBox" class="info-box collapsed">
     <h3>This generator creates playable and (almost) equal positions. Here are the non-modifiable conditions</h3>           
     <ul style="text-align: left; padding-left: 20px; line-height: 1.8;">
@@ -731,7 +734,7 @@ header {
 </div>
                 
                 <button id="generateBtn" class="generate-btn">
-                    <span id="btnText">🎲 Générer une position</span>
+                    <span id="btnText">Create a position</span>
                     <span id="btnLoader" class="loader" style="display: none;"></span>
                 </button>
             </div>
