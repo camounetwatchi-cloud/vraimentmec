@@ -277,9 +277,9 @@ def get_stockfish_evaluation_batch(fens: list):
             try:
                 board = chess.Board(fen)
                 info = temp_engine.analyse(board, 
-                                          chess.engine.Limit(depth=STOCKFISH_DEPTH, 
-                                                             time=STOCKFISH_TIME_LIMIT),
-                                          multipv=2)
+                                         chess.engine.Limit(depth=STOCKFISH_DEPTH, 
+                                                               time=STOCKFISH_TIME_LIMIT),
+                                         multipv=2)
                 
                 if len(info) < 2:
                     results.append((None, None))
@@ -309,7 +309,8 @@ def get_stockfish_evaluation_batch(fens: list):
 
     return results
 
-def generate_fen_position(negative_min=-99, negative_max=-15, positive_min=15, positive_max=99, material_diff=3, max_material=22, max_attempts=20000, excluded_pieces=None):    """Fonction principale appelée par l'API
+def generate_fen_position(negative_min=-99, negative_max=-15, positive_min=15, positive_max=99, material_diff=3, max_material=22, max_attempts=20000, excluded_pieces=None):
+    """Fonction principale appelée par l'API
     
     Args:
         target_min: Évaluation minimum en centipions (0-99)
@@ -369,8 +370,8 @@ def generate_fen_position(negative_min=-99, negative_max=-15, positive_min=15, p
                     for (fen, board, w_mat, b_mat), (scores_cp, scores_str) in zip(candidates_buffer, results):
                         if scores_cp and len(scores_cp) >= 2:
                             valid_count = sum(1 for cp in scores_cp[:2] 
-                  if (negative_min <= cp <= negative_max) or
-                     (positive_min <= cp <= positive_max)))
+                                          if (negative_min <= cp <= negative_max) or 
+                                             (positive_min <= cp <= positive_max))
                             
                             if valid_count >= 2:
                                 return {
