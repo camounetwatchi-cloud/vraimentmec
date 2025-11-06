@@ -1136,13 +1136,15 @@ if (positiveMin > positiveMax) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                target_min: targetMin,
-                target_max: targetMax,
-                material_diff: materialDiff,
-                max_material: maxMaterial,
-                max_attempts: maxAttempts,
-                excluded_pieces: filteredPieces
-            })
+    negative_min: negativeMin,
+    negative_max: negativeMax,
+    positive_min: positiveMin,
+    positive_max: positiveMax,
+    material_diff: materialDiff,
+    max_material: maxMaterial,
+    max_attempts: maxAttempts,
+    excluded_pieces: filteredPieces
+})
         });
 
         const result = await response.json();
