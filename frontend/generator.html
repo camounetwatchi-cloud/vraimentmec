@@ -981,50 +981,6 @@ maxMaterialSlider.addEventListener('input', () => {
 });
 });
 
-targetMaxSlider.addEventListener('input', () => {
-    let min = parseInt(targetMinSlider.value);
-    let max = parseInt(targetMaxSlider.value);
-    
-    if (max <= min) {
-        targetMinSlider.value = max - 5;
-        min = max - 5;
-    }
-    
-    // Conversion centipions en pawns et formatage
-    const minPawns = (min / 100).toFixed(2);
-    const maxPawns = (max / 100).toFixed(2);
-    
-    targetMinValue.textContent = minPawns > 0 ? `+${minPawns}` : minPawns;
-    targetMaxValue.textContent = maxPawns > 0 ? `+${maxPawns}` : maxPawns;
-    
-    // Mettre à jour les positions des curseurs pour la barre colorée
-    updateRangeTrack();
-});
-
-// Fonction pour mettre à jour la barre de progression colorée
-function updateRangeTrack() {
-    const min = parseInt(targetMinSlider.value);
-    const max = parseInt(targetMaxSlider.value);
-    const minPercent = (min / 99) * 100;
-    const maxPercent = (max / 99) * 100;
-    
-    targetMinSlider.style.setProperty('--min-percent', `${minPercent}%`);
-    targetMinSlider.style.setProperty('--max-percent', `${maxPercent}%`);
-    targetMaxSlider.style.setProperty('--min-percent', `${minPercent}%`);
-    targetMaxSlider.style.setProperty('--max-percent', `${maxPercent}%`);
-}
-
-// Initialiser l'affichage au chargement
-updateRangeTrack();
-
-// Update écart matériel
-materialDiffSlider.addEventListener('input', () => {
-    materialDiffValue.textContent = materialDiffSlider.value;
-});
-
-// Update matériel max
-maxMaterialSlider.addEventListener('input', () => {
-    maxMaterialValue.textContent = maxMaterialSlider.value;
     const pieceItems = document.querySelectorAll('.piece-filter-item');
     
     pieceItems.forEach(item => {
