@@ -239,8 +239,11 @@ def generate_position():
         data = request.get_json()
         
         # Récupérer les paramètres avec valeurs par défaut
-        target_min = data.get('target_min', 25)
-        target_max = data.get('target_max', 100)
+        # Récupérer les paramètres avec valeurs par défaut
+        negative_min = data.get('negative_min', -99)
+        negative_max = data.get('negative_max', -15)
+        positive_min = data.get('positive_min', 15)
+        positive_max = data.get('positive_max', 99)
         material_diff = data.get('material_diff', 3)
         max_material = data.get('max_material', 22)
         max_attempts = data.get('max_attempts', 20000)
@@ -300,13 +303,15 @@ def generate_position():
         
         # MODIFIER L'APPEL À LA FONCTION
         result = generate_fen_position(
-            target_min, 
-            target_max, 
-            material_diff, 
-            max_material, 
-            max_attempts,
-            excluded_pieces  # AJOUTER CE PARAMÈTRE
-        )
+    negative_min,
+    negative_max,
+    positive_min,
+    positive_max,
+    material_diff, 
+    max_material, 
+    max_attempts,
+    excluded_pieces
+)
         
         return jsonify({
             'success': True,
