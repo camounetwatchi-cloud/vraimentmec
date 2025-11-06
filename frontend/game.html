@@ -1132,7 +1132,7 @@
 
                 if (data.success) {
                     loadPosition(data.data.fen);
-                    updateStatus('✅ Nouvelle position chargée depuis le cache !', 'playing');
+                    updateStatus('', 'playing');
                     console.log('📊 Position:', data.data);
                 } else {
                     updateStatus('❌ ' + data.error, 'waiting');
