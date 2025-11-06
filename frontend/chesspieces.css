@@ -1,0 +1,24 @@
+/* Styles pour les pièces d'échecs SVG */
+.chess-piece {
+    width: 100%;
+    height: 100%;
+    background-size: 80%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Pièces blanches */
+.piece-K { background-image: url('chesspieces/king-w.svg'); }
+.piece-Q { background-image: url('chesspieces/queen-w.svg'); }
+.piece-R { background-image: url('chesspieces/rook-w.svg'); }
+.piece-B { background-image: url('chesspieces/bishop-w.svg'); }
+.piece-N { background-image: url('chesspieces/knight-w.svg'); }
+.piece-P { background-image: url('chesspieces/pawn-w.svg'); }
+
+/* Pièces noires */
+.piece-k { background-image: url('chesspieces/king-b.svg'); }
+.piece-q { background-image: url('chesspieces/queen-b.svg'); }
+.piece-r { background-image: url('chesspieces/rook-b.svg'); }
+.piece-b { background-image: url('chesspieces/bishop-b.svg'); }
+.piece-n { background-image: url('chesspieces/knight-b.svg'); }
+.piece-p { background-image: url('chesspieces/pawn-b.svg'); }
