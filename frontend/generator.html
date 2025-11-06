@@ -698,6 +698,52 @@ header {
 .piece {
     user-select: none;
 }
+
+/* Encadré pour les sliders d'évaluation */
+.sliders-box {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 3px solid #667eea;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+    position: relative;
+}
+
+.sliders-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #f44336 0%, #667eea 50%, #4caf50 100%);
+    border-radius: 15px 15px 0 0;
+}
+
+.sliders-title {
+    color: #667eea;
+    font-size: 1.2em;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Amélioration visuelle des labels dans l'encadré */
+.sliders-box .control-group small {
+    font-size: 0.9em;
+}
+
+.sliders-box .range-container {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+        
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
@@ -796,42 +842,44 @@ header {
 </div>
 
 <div class="controls">
-    <!-- Évaluation Range -->
-<div class="control-group control-full-width">
-    <label>Évaluation (en pions):</label>
-    
-    <!-- Range négatif -->
-    <div style="margin-bottom: 25px;">
-        <div style="text-align: center; margin-bottom: 10px;">
-            <small style="color: #999;">Désavantage blanc: de </small>
-            <span id="negativeMinValue" style="color: #f44336; font-weight: 600;">-0.99</span>
-            <small style="color: #999;"> à </small>
-            <span id="negativeMaxValue" style="color: #f44336; font-weight: 600;">-0.15</span>
-        </div>
-        <div class="range-container" style="position: relative; height: 40px;">
-            <input type="range" id="negativeMin" min="-99" max="-15" value="-99" step="1" 
-                   class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
-            <input type="range" id="negativeMax" min="-99" max="-15" value="-15" step="1" 
-                   class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+    <!-- Encadré pour les sliders d'évaluation -->
+    <div class="sliders-box">
+        <h3 class="sliders-title">🎯 Plage d'évaluation</h3>
+        
+        <div class="control-group control-full-width">
+            <!-- Range négatif -->
+            <div style="margin-bottom: 25px;">
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <small style="color: #999;">Désavantage blanc: de </small>
+                    <span id="negativeMinValue" style="color: #f44336; font-weight: 600;">-0.99</span>
+                    <small style="color: #999;"> à </small>
+                    <span id="negativeMaxValue" style="color: #f44336; font-weight: 600;">-0.15</span>
+                </div>
+                <div class="range-container" style="position: relative; height: 40px;">
+                    <input type="range" id="negativeMin" min="-99" max="-15" value="-99" step="1" 
+                           class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+                    <input type="range" id="negativeMax" min="-99" max="-15" value="-15" step="1" 
+                           class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+                </div>
+            </div>
+            
+            <!-- Range positif -->
+            <div>
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <small style="color: #999;">Avantage blanc: de </small>
+                    <span id="positiveMinValue" style="color: #4caf50; font-weight: 600;">+0.15</span>
+                    <small style="color: #999;"> à </small>
+                    <span id="positiveMaxValue" style="color: #4caf50; font-weight: 600;">+0.99</span>
+                </div>
+                <div class="range-container" style="position: relative; height: 40px;">
+                    <input type="range" id="positiveMin" min="15" max="99" value="15" step="1" 
+                           class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+                    <input type="range" id="positiveMax" min="15" max="99" value="99" step="1" 
+                           class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+                </div>
+            </div>
         </div>
     </div>
-    
-    <!-- Range positif -->
-    <div>
-        <div style="text-align: center; margin-bottom: 10px;">
-            <small style="color: #999;">Avantage blanc: de </small>
-            <span id="positiveMinValue" style="color: #4caf50; font-weight: 600;">+0.15</span>
-            <small style="color: #999;"> à </small>
-            <span id="positiveMaxValue" style="color: #4caf50; font-weight: 600;">+0.99</span>
-        </div>
-        <div class="range-container" style="position: relative; height: 40px;">
-            <input type="range" id="positiveMin" min="15" max="99" value="15" step="1" 
-                   class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
-            <input type="range" id="positiveMax" min="15" max="99" value="99" step="1" 
-                   class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
-        </div>
-    </div>
-</div>
     
     <!-- Écart matériel et Matériel max sur la même ligne -->
     <div class="control-group control-full-width">
@@ -864,11 +912,11 @@ header {
         </div>
     </div>
           
-                <button id="generateBtn" class="generate-btn">
-                    <span id="btnText">Create a position</span>
-                    <span id="btnLoader" class="loader" style="display: none;"></span>
-                </button>
-            </div>
+    <button id="generateBtn" class="generate-btn">
+        <span id="btnText">Create a position</span>
+        <span id="btnLoader" class="loader" style="display: none;"></span>
+    </button>
+</div>
 
             <div id="status" class="status hidden"></div>
 
