@@ -150,6 +150,14 @@ def serve_navbar_css():
 def serve_global_css():
     return send_from_directory('../frontend', 'global.css')
 
+@app.route('/chesspieces.css')
+def serve_chesspieces_css():
+    return send_from_directory('../frontend', 'chesspieces.css')
+
+@app.route('/chesspieces/<path:filename>')
+def serve_chesspiece(filename):
+    return send_from_directory('../frontend/chesspieces', filename)
+
 # ========================================
 # ENREGISTREMENT DES BLUEPRINTS
 # ========================================
