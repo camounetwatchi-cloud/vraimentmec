@@ -367,11 +367,16 @@ header {
     flex-shrink: 0;
 }
 
+.generator-controls {
+    flex: 1;
+    min-width: 0; /* Important pour le flex */
+}
+
 .main-content {
     display: flex;
     gap: 20px;
     align-items: flex-start;
-    margin-top: 20px;
+    width: 100%;
 }
 
 .filters-title {
