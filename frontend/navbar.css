@@ -14,6 +14,8 @@
     max-width: 1600px;
     margin-left: auto;
     margin-right: auto;
+    position: relative; /* AJOUTER CETTE LIGNE */
+    z-index: 100; /* AJOUTER CETTE LIGNE */
 }
 
 .navbar-brand {
