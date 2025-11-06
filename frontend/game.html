@@ -1072,6 +1072,7 @@
         const piece = boardArray[displayRow][displayCol];
         
         square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+        square.innerHTML = ''; // Vider le contenu
         
         if (piece) {
             const pieceSymbol = piece.type.toUpperCase();
@@ -1079,10 +1080,7 @@
             
             const pieceDiv = document.createElement('div');
             pieceDiv.className = `chess-piece piece-${pieceColor}`;
-            square.innerHTML = '';
             square.appendChild(pieceDiv);
-        } else {
-            square.innerHTML = '';
         }
     });
     
