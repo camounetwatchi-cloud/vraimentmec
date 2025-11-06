@@ -1072,21 +1072,20 @@
         
         square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
         
-        // *** MODIFICATION ICI ***
         if (piece) {
             const pieceSymbol = piece.type.toUpperCase();
             const pieceColor = piece.color === 'w' ? pieceSymbol : pieceSymbol.toLowerCase();
             
-            // Créer une div pour la pièce au lieu d'utiliser textContent
             const pieceDiv = document.createElement('div');
             pieceDiv.className = `chess-piece piece-${pieceColor}`;
-            square.innerHTML = ''; // Vider le contenu
+            square.innerHTML = '';
             square.appendChild(pieceDiv);
         } else {
             square.innerHTML = '';
         }
     });
     
+    // Vérification de l'échec
     if (chessGame.in_check()) {
         const turn = chessGame.turn();
         const kingSquare = findKingSquare(turn);
