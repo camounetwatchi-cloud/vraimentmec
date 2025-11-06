@@ -838,12 +838,6 @@
         // Instance Chess.js pour la logique locale
         let chessGame = new Chess(currentFen);
 
-        // Unicode chess pieces
-        const PIECES = {
-            'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-            'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
-        };
-
         window.addEventListener('load', async () => {
     await checkNavAuthentication();
     initializeBoard();
