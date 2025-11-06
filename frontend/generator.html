@@ -599,20 +599,8 @@ header {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
 <body>
-    <!-- Navigation Bar d'abord -->
-    <div class="navbar-wrapper">
-        <div class="navbar">
-            <!-- ... contenu navbar inchangé ... -->
-        </div>
-    </div>
-
-    <div class="container">
-        <header>
-            <!-- ... contenu header inchangé ... -->
-        </header>
-
-        <div class="main-content">
-        <div class="navbar">
+    <!-- Navigation Bar -->
+    <div class="navbar">
         <a href="index.html" class="navbar-brand">
             ♟️ Échecs en Ligne
         </a>
@@ -644,26 +632,39 @@ header {
 
     <div class="container">
         <header>
-    <h1>🎲 Random chess FEN generator</h1>
-    <p class="subtitle">No more pattern recognition : Welcome to concrete chess</p>
-    <button id="learnMoreBtn" class="learn-more-btn">
-        <span id="learnMoreText">Learn more ▼</span>
-    </button>
-</header>
+            <h1>🎲 Random chess FEN generator</h1>
+            <p class="subtitle">No more pattern recognition : Welcome to concrete chess</p>
+            <button id="learnMoreBtn" class="learn-more-btn">
+                <span id="learnMoreText">Learn more ▼</span>
+            </button>
+        </header>
 
-    <div class="main-content" style="display: flex; gap: 20px; align-items: flex-start;">
-       
-        <!-- Panneau de filtrage À GAUCHE -->
-        <div class="filters-container">
-            <div class="filters-title">Choose your pieces</div>
-            <div class="pieces-filter">
-                <div class="piece-filter-item" data-piece="queen" title="Dame">♕</div>
-                <div class="piece-filter-item" data-piece="rook" title="Tour">♖</div>
-                <div class="piece-filter-item" data-piece="bishop" title="Fou">♗</div>
-                <div class="piece-filter-item" data-piece="knight" title="Cavalier">♘</div>
-                <div class="piece-filter-item" data-piece="pawn" title="Pion">♙</div>
+        <main>
+            <div id="infoBox" class="info-box collapsed">
+                <h3>This generator creates playable and (almost) equal positions. Here are the non-modifiable conditions</h3>           
+                <ul style="text-align: left; padding-left: 20px; line-height: 1.8;">
+                    <li><strong>At least 2 "equal" lines</strong> To avoid boring lines and perpetuals</li>
+                    <li><strong>A maximum disadvantage/advantage of 1 pawn equivalent</strong> To keep it playable</li>
+                    <li><strong>Matériel limité :</strong> Maximum 22 points par côté</li>
+                    <li><strong>Fous de couleurs opposées :</strong> Chaque camp a au maximum 1 fou sur cases blanches et 1 sur cases noires</li>
+                </ul>
+                <p style="margin-top: 12px; color: #856404;">
+                    ⏱️ La génération peut prendre jusqu'à 2 minutes selon le nombre de tentatives.
+                </p>
             </div>
-        </div>
+
+            <div class="main-content">
+                <!-- Panneau de filtrage À GAUCHE -->
+                <div class="filters-container">
+                    <div class="filters-title">Choose your pieces</div>
+                    <div class="pieces-filter">
+                        <div class="piece-filter-item" data-piece="queen" title="Dame">♕</div>
+                        <div class="piece-filter-item" data-piece="rook" title="Tour">♖</div>
+                        <div class="piece-filter-item" data-piece="bishop" title="Fou">♗</div>
+                        <div class="piece-filter-item" data-piece="knight" title="Cavalier">♘</div>
+                        <div class="piece-filter-item" data-piece="pawn" title="Pion">♙</div>
+                    </div>
+                </div>
 
         <!-- Contrôles à droite -->
         <div class="generator-controls" style="flex: 1;">
@@ -807,7 +808,7 @@ header {
         </main>
 
         <footer>
-            <p>Propulsé par Stockfish • Backend Flask • Python Chess</p>
+            <p>haha</p>
         </footer>
     </div>
 <script src="navbar.js"></script>
