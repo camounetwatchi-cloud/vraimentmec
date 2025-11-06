@@ -364,7 +364,7 @@ header {
     padding: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     width: 150px;
-    flex-shrink: 0; /* Empêche le rétrécissement */
+    flex-shrink: 0;
 }
 
 .main-content {
@@ -612,24 +612,6 @@ header {
         </header>
 
         <div class="main-content">
-            <!-- Panneau de filtrage À GAUCHE -->
-            <div class="filters-container">
-                <div class="filters-title">Choose your pieces</div>
-                <div class="pieces-filter">
-                    <div class="piece-filter-item" data-piece="queen" title="Dame">♕</div>
-                    <div class="piece-filter-item" data-piece="rook" title="Tour">♖</div>
-                    <div class="piece-filter-item" data-piece="bishop" title="Fou">♗</div>
-                    <div class="piece-filter-item" data-piece="knight" title="Cavalier">♘</div>
-                    <div class="piece-filter-item" data-piece="pawn" title="Pion">♙</div>
-                </div>
-            </div>
-           
-            <!-- Contrôles à droite -->
-            <div class="generator-controls" style="flex: 1;">
-                <!-- ... reste du contenu inchangé ... -->
-            </div>
-        </div>
-    </div>
         <div class="navbar">
         <a href="index.html" class="navbar-brand">
             ♟️ Échecs en Ligne
@@ -671,6 +653,18 @@ header {
 
     <div class="main-content" style="display: flex; gap: 20px; align-items: flex-start;">
        
+        <!-- Panneau de filtrage À GAUCHE -->
+        <div class="filters-container">
+            <div class="filters-title">Choose your pieces</div>
+            <div class="pieces-filter">
+                <div class="piece-filter-item" data-piece="queen" title="Dame">♕</div>
+                <div class="piece-filter-item" data-piece="rook" title="Tour">♖</div>
+                <div class="piece-filter-item" data-piece="bishop" title="Fou">♗</div>
+                <div class="piece-filter-item" data-piece="knight" title="Cavalier">♘</div>
+                <div class="piece-filter-item" data-piece="pawn" title="Pion">♙</div>
+            </div>
+        </div>
+
         <!-- Contrôles à droite -->
         <div class="generator-controls" style="flex: 1;">
             <div class="controls">
