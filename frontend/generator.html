@@ -524,6 +524,52 @@ header {
     z-index: 3;
 }
 
+.range-slider-quad {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: linear-gradient(to right,
+        #f44336 0%,
+        #f44336 24.5%,
+        #e0e0e0 24.5%,
+        #e0e0e0 50%,
+        #e0e0e0 50%,
+        #e0e0e0 75.5%,
+        #4caf50 75.5%,
+        #4caf50 100%
+    );
+    outline: none;
+    margin: 10px 0;
+    position: absolute;
+    pointer-events: none;
+}
+
+.range-slider-quad::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    pointer-events: all;
+    transition: all 0.3s;
+    z-index: 10;
+}
+
+.range-slider-quad::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    border: none;
+    pointer-events: all;
+    transition: all 0.3s;
+}
+
 .control-group label {
     display: flex;
     justify-content: space-between;
@@ -706,14 +752,23 @@ header {
 <div class="controls">
     <!-- Évaluation Range -->
 <div class="control-group control-full-width">
-    <label>Évaluation (centipions):</label>
-    <div class="range-values-top">
-        From <span id="targetMinValue">+0.25</span> to <span id="targetMaxValue">+1.00</span>
+    <label>Évaluation (en pions):</label>
+    <div class="range-values-top" style="display: flex; justify-content: space-around; margin-bottom: 15px;">
+        <div style="text-align: center;">
+            <small style="color: #999;">Désavantage blanc</small><br>
+            From <span id="negativeMinValue">-0.99</span> to <span id="negativeMaxValue">-0.15</span>
+        </div>
+        <div style="text-align: center;">
+            <small style="color: #999;">Avantage blanc</small><br>
+            From <span id="positiveMinValue">+0.15</span> to <span id="positiveMaxValue">+0.99</span>
+        </div>
     </div>
     <div class="range-container">
         <div style="position: relative;">
-            <input type="range" id="targetMin" min="0" max="99" value="25" step="1" class="range-slider range-slider-dual">
-            <input type="range" id="targetMax" min="0" max="99" value="100" step="1" class="range-slider range-slider-dual">
+            <input type="range" id="negativeMin" min="-99" max="-15" value="-99" step="1" class="range-slider range-slider-quad">
+            <input type="range" id="negativeMax" min="-99" max="-15" value="-15" step="1" class="range-slider range-slider-quad">
+            <input type="range" id="positiveMin" min="15" max="99" value="15" step="1" class="range-slider range-slider-quad">
+            <input type="range" id="positiveMax" min="15" max="99" value="99" step="1" class="range-slider range-slider-quad">
         </div>
     </div>
 </div>
@@ -845,34 +900,85 @@ learnMoreBtn.addEventListener('click', () => {
     }
 });
     // Gestion des sliders
-const targetMinSlider = document.getElementById('targetMin');
-const targetMaxSlider = document.getElementById('targetMax');
-const targetMinValue = document.getElementById('targetMinValue');
-const targetMaxValue = document.getElementById('targetMaxValue');
+// Gestion des 4 sliders d'évaluation
+const negativeMinSlider = document.getElementById('negativeMin');
+const negativeMaxSlider = document.getElementById('negativeMax');
+const positiveMinSlider = document.getElementById('positiveMin');
+const positiveMaxSlider = document.getElementById('positiveMax');
+
+const negativeMinValue = document.getElementById('negativeMinValue');
+const negativeMaxValue = document.getElementById('negativeMaxValue');
+const positiveMinValue = document.getElementById('positiveMinValue');
+const positiveMaxValue = document.getElementById('positiveMaxValue');
+
 const materialDiffSlider = document.getElementById('materialDiff');
 const materialDiffValue = document.getElementById('materialDiffValue');
 const maxMaterialSlider = document.getElementById('maxMaterial');
 const maxMaterialValue = document.getElementById('maxMaterialValue');
 
-// Update évaluation min/max avec conversion centipions
-targetMinSlider.addEventListener('input', () => {
-    let min = parseInt(targetMinSlider.value);
-    let max = parseInt(targetMaxSlider.value);
+// Update sliders négatifs
+negativeMinSlider.addEventListener('input', () => {
+    let min = parseInt(negativeMinSlider.value);
+    let max = parseInt(negativeMaxSlider.value);
     
-    if (min >= max) {
-        targetMaxSlider.value = min + 5;
-        max = min + 5;
+    if (min > max) {
+        negativeMaxSlider.value = min;
+        max = min;
     }
     
-    // Conversion centipions en pawns et formatage
-    const minPawns = (min / 100).toFixed(2);
-    const maxPawns = (max / 100).toFixed(2);
+    negativeMinValue.textContent = (min / 100).toFixed(2);
+    negativeMaxValue.textContent = (max / 100).toFixed(2);
+});
+
+negativeMaxSlider.addEventListener('input', () => {
+    let min = parseInt(negativeMinSlider.value);
+    let max = parseInt(negativeMaxSlider.value);
     
-    targetMinValue.textContent = minPawns > 0 ? `+${minPawns}` : minPawns;
-    targetMaxValue.textContent = maxPawns > 0 ? `+${maxPawns}` : maxPawns;
+    if (max < min) {
+        negativeMinSlider.value = max;
+        min = max;
+    }
     
-    // Mettre à jour les positions des curseurs pour la barre colorée
-    updateRangeTrack();
+    negativeMinValue.textContent = (min / 100).toFixed(2);
+    negativeMaxValue.textContent = (max / 100).toFixed(2);
+});
+
+// Update sliders positifs
+positiveMinSlider.addEventListener('input', () => {
+    let min = parseInt(positiveMinSlider.value);
+    let max = parseInt(positiveMaxSlider.value);
+    
+    if (min > max) {
+        positiveMaxSlider.value = min;
+        max = min;
+    }
+    
+    positiveMinValue.textContent = '+' + (min / 100).toFixed(2);
+    positiveMaxValue.textContent = '+' + (max / 100).toFixed(2);
+});
+
+positiveMaxSlider.addEventListener('input', () => {
+    let min = parseInt(positiveMinSlider.value);
+    let max = parseInt(positiveMaxSlider.value);
+    
+    if (max < min) {
+        positiveMinSlider.value = max;
+        min = max;
+    }
+    
+    positiveMinValue.textContent = '+' + (min / 100).toFixed(2);
+    positiveMaxValue.textContent = '+' + (max / 100).toFixed(2);
+});
+
+// Update écart matériel
+materialDiffSlider.addEventListener('input', () => {
+    materialDiffValue.textContent = materialDiffSlider.value;
+});
+
+// Update matériel max
+maxMaterialSlider.addEventListener('input', () => {
+    maxMaterialValue.textContent = maxMaterialSlider.value;
+});
 });
 
 targetMaxSlider.addEventListener('input', () => {
@@ -966,27 +1072,44 @@ function resetFilters() {
 
         // Gestionnaire du bouton de génération
 generateBtn.addEventListener('click', async () => {
-    const targetMin = parseInt(document.getElementById('targetMin').value);
-    const targetMax = parseInt(document.getElementById('targetMax').value);
+    const negativeMin = parseInt(document.getElementById('negativeMin').value);
+    const negativeMax = parseInt(document.getElementById('negativeMax').value);
+    const positiveMin = parseInt(document.getElementById('positiveMin').value);
+    const positiveMax = parseInt(document.getElementById('positiveMax').value);
     const materialDiff = parseInt(document.getElementById('materialDiff').value);
     const maxMaterial = parseInt(document.getElementById('maxMaterial').value);
     const maxAttempts = 10000; // ← MODIFIER CETTE LIGNE (supprimer le getElementById)
 
     // Validations
-    if (targetMin < 0 || targetMin > 99) {
-        showStatus('Erreur: Évaluation min doit être entre 0 et 99', 'error');
-        return;
-    }
-    
-    if (targetMax < 1 || targetMax > 99) {
-        showStatus('Erreur: Évaluation max doit être entre 1 et 99', 'error');
-        return;
-    }
-    
-    if (targetMin >= targetMax) {
-        showStatus('Erreur: Évaluation min doit être inférieure à évaluation max', 'error');
-        return;
-    }
+if (negativeMin < -99 || negativeMin > -15) {
+    showStatus('Erreur: Range négatif invalide', 'error');
+    return;
+}
+
+if (negativeMax < -99 || negativeMax > -15) {
+    showStatus('Erreur: Range négatif invalide', 'error');
+    return;
+}
+
+if (negativeMin > negativeMax) {
+    showStatus('Erreur: Min négatif doit être inférieur au max négatif', 'error');
+    return;
+}
+
+if (positiveMin < 15 || positiveMin > 99) {
+    showStatus('Erreur: Range positif invalide', 'error');
+    return;
+}
+
+if (positiveMax < 15 || positiveMax > 99) {
+    showStatus('Erreur: Range positif invalide', 'error');
+    return;
+}
+
+if (positiveMin > positiveMax) {
+    showStatus('Erreur: Min positif doit être inférieur au max positif', 'error');
+    return;
+}
     
     if (materialDiff < 0 || materialDiff > 6) {
         showStatus('Erreur: Écart matériel doit être entre 0 et 6', 'error');
