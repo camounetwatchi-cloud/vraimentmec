@@ -1096,18 +1096,6 @@
     
     console.log('✅ Échiquier rendu');
 }
-            
-            if (chessGame.in_check()) {
-                const turn = chessGame.turn();
-                const kingSquare = findKingSquare(turn);
-                if (kingSquare) {
-                    const square = document.querySelector(`[data-row="${kingSquare.row}"][data-col="${kingSquare.col}"]`);
-                    if (square) square.classList.add('check');
-                }
-            }
-            
-            console.log('✅ Échiquier rendu');
-        }
 
         function findKingSquare(color) {
             const boardArray = chessGame.board();
