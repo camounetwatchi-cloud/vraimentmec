@@ -157,6 +157,11 @@ def serve_chesspieces_css():
 @app.route('/chesspieces/<path:filename>')
 def serve_chesspiece(filename):
     return send_from_directory('../frontend/chesspieces', filename)
+    
+@app.route('/favicon.ico')
+def serve_favicon():
+    # Retourne un fichier vide ou votre favicon si vous en avez un
+    return '', 204
 
 # ========================================
 # ENREGISTREMENT DES BLUEPRINTS
