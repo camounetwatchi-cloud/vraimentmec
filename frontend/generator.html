@@ -3,6 +3,7 @@
 <head>
     <link rel="stylesheet" href="navbar.css">
     <link rel="stylesheet" href="global.css">  
+    <link rel="stylesheet" href="chesspieces.css">  <!-- AJOUTER CETTE LIGNE -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Générateur de Positions - Échecs</title>
@@ -1144,13 +1145,6 @@ if (positiveMin > positiveMax) {
         btnLoader.style.display = 'none';
     }
 });
-
-// Unicode chess pieces
-const PIECES = {
-    'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-    'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
-};
-
 // Afficher les résultats
 function displayResults(data) {
     document.getElementById('fenText').textContent = data.fen;
@@ -1172,7 +1166,6 @@ function displayResults(data) {
     resultsDiv.classList.remove('hidden');
 }
 
-// Fonction pour afficher l'échiquier
 function renderBoard(fen) {
     const chessboard = document.getElementById('resultChessboard');
     chessboard.innerHTML = '';
@@ -1188,11 +1181,14 @@ function renderBoard(fen) {
                 
                 const piece = boardArray[row][col];
                 
+                // *** MODIFICATION ICI ***
                 if (piece) {
                     const pieceSymbol = piece.type.toUpperCase();
                     const pieceColor = piece.color === 'w' ? pieceSymbol : pieceSymbol.toLowerCase();
-                    square.textContent = PIECES[pieceColor] || '';
-                    square.classList.add('piece');
+                    
+                    const pieceDiv = document.createElement('div');
+                    pieceDiv.className = `chess-piece piece-${pieceColor}`;
+                    square.appendChild(pieceDiv);
                 }
                 
                 chessboard.appendChild(square);
