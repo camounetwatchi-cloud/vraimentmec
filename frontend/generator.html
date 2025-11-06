@@ -426,6 +426,28 @@ header {
     user-select: none;
 }
 
+.piece-filter-item {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border: 3px solid #e0e0e0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    user-select: none;
+    position: relative; /* Important pour le ::after */
+    padding: 8px; /* Pour donner de l'espace à la pièce */
+}
+
+.piece-filter-item .chess-piece {
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Pour que les clics passent à travers */
+}
+
 .piece-filter-item:hover {
     transform: scale(1.1);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
@@ -443,6 +465,7 @@ header {
     font-size: 30px;
     color: #f44336;
     font-weight: bold;
+    pointer-events: none; /* Pour ne pas interférer avec les clics */
 }
 
 /* Range sliders */
@@ -738,12 +761,22 @@ header {
                 <div class="filters-container">
                     <div class="filters-title">Choose your pieces</div>
                     <div class="pieces-filter">
-                        <div class="piece-filter-item" data-piece="queen" title="Dame">♕</div>
-                        <div class="piece-filter-item" data-piece="rook" title="Tour">♖</div>
-                        <div class="piece-filter-item" data-piece="bishop" title="Fou">♗</div>
-                        <div class="piece-filter-item" data-piece="knight" title="Cavalier">♘</div>
-                        <div class="piece-filter-item" data-piece="pawn" title="Pion">♙</div>
-                    </div>
+    <div class="piece-filter-item" data-piece="queen" title="Dame">
+        <div class="chess-piece piece-Q"></div>
+    </div>
+    <div class="piece-filter-item" data-piece="rook" title="Tour">
+        <div class="chess-piece piece-R"></div>
+    </div>
+    <div class="piece-filter-item" data-piece="bishop" title="Fou">
+        <div class="chess-piece piece-B"></div>
+    </div>
+    <div class="piece-filter-item" data-piece="knight" title="Cavalier">
+        <div class="chess-piece piece-N"></div>
+    </div>
+    <div class="piece-filter-item" data-piece="pawn" title="Pion">
+        <div class="chess-piece piece-P"></div>
+    </div>
+</div>
                 </div>
 
         <!-- Contrôles à droite -->
