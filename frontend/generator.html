@@ -838,45 +838,58 @@ header {
 <div>
     <div style="text-align: center; margin-bottom: 10px;">
         <small style="color: #999;">Plage d'évaluation symétrique : </small>
-        <span id="evalRangeValue" style="font-weight: 600; font-size: 1.2em;">±0.99</span>
+        <span id="evalRangeValue" style="font-weight: 600; font-size: 1.2em;">-0.99 / +0.99</span>
     </div>
     <div class="range-container" style="position: relative; height: 60px;">
-        <!-- Track visuel de base -->
-        <div style="position: absolute; width: 100%; height: 8px; top: 26px; border-radius: 5px; background: linear-gradient(to right, 
-            #333 0%, 
-            #333 50%, 
-            #fff 50%, 
-            #fff 100%);
+        <!-- Track visuel de base (noir à gauche, blanc à droite) -->
+        <div style="position: absolute; width: 100%; height: 8px; top: 26px; border-radius: 5px; 
+            background: linear-gradient(to right, 
+                #333 0%, 
+                #333 50%, 
+                #fff 50%, 
+                #fff 100%);
             border: 1px solid #999;">
         </div>
         
-        <!-- Zone bloquée centrale grisée et hachurée (-0.15 à +0.15) -->
+        <!-- Zone bloquée centrale (-0.15 à +0.15 = 42.5% à 57.5%) -->
         <div style="position: absolute; left: 42.5%; width: 15%; height: 8px; top: 26px; 
             background: repeating-linear-gradient(
                 45deg,
-                #ccc,
-                #ccc 4px,
-                #999 4px,
-                #999 8px
+                #bbb,
+                #bbb 4px,
+                #888 4px,
+                #888 8px
             ); 
             border-radius: 5px; 
-            z-index: 2;
+            z-index: 3;
             border: 1px solid #666;">
         </div>
         
-        <!-- Zone active gauche (négative) -->
-        <div id="activeZoneLeft" style="position: absolute; height: 8px; top: 26px; background: #667eea; opacity: 0.7; z-index: 1;"></div>
+        <!-- Zone active gauche (négative) - de 0% jusqu'au curseur gauche -->
+        <div id="activeZoneLeft" style="position: absolute; height: 8px; top: 26px; 
+            background: rgba(102, 126, 234, 0.5); 
+            z-index: 1; 
+            left: 0%;
+            border-radius: 5px 0 0 5px;">
+        </div>
         
-        <!-- Zone active droite (positive) -->
-        <div id="activeZoneRight" style="position: absolute; height: 8px; top: 26px; background: #667eea; opacity: 0.7; z-index: 1;"></div>
+        <!-- Zone active droite (positive) - du curseur droit jusqu'à 100% -->
+        <div id="activeZoneRight" style="position: absolute; height: 8px; top: 26px; 
+            background: rgba(102, 126, 234, 0.5); 
+            z-index: 1;
+            right: 0%;
+            border-radius: 0 5px 5px 0;">
+        </div>
         
-        <!-- Curseur gauche (négatif) -->
-        <input type="range" id="evalMinSlider" min="15" max="42" value="15" step="1" 
-               class="range-slider" style="position: absolute; width: 100%;">
+        <!-- Curseur GAUCHE (négatif) : 0 à 42 = -0.99 à -0.15 -->
+        <input type="range" id="evalMinSlider" min="0" max="42" value="0" step="1" 
+               class="range-slider" 
+               style="position: absolute; width: 100%; z-index: 4;">
         
-        <!-- Curseur droit (positif) -->
-        <input type="range" id="evalMaxSlider" min="58" max="99" value="99" step="1" 
-               class="range-slider" style="position: absolute; width: 100%;">
+        <!-- Curseur DROIT (positif) : 58 à 100 = +0.15 à +0.99 -->
+        <input type="range" id="evalMaxSlider" min="58" max="100" value="100" step="1" 
+               class="range-slider" 
+               style="position: absolute; width: 100%; z-index: 5;">
     </div>
     <div style="text-align: center; margin-top: 10px; font-size: 0.85em; color: #666;">
         <span id="evalMinDisplay" style="color: #333; font-weight: 600;">-0.99</span> 
@@ -1024,17 +1037,28 @@ const evalMaxDisplay = document.getElementById('evalMaxDisplay');
 const activeZoneLeft = document.getElementById('activeZoneLeft');
 const activeZoneRight = document.getElementById('activeZoneRight');
 
+function convertSliderToEval(sliderValue, isNegative) {
+    if (isNegative) {
+        // 0 à 42 → -0.99 à -0.15
+        // Formule: -0.99 + (sliderValue * 0.84 / 42)
+        return -0.99 + (sliderValue * 0.84 / 42);
+    } else {
+        // 58 à 100 → +0.15 à +0.99
+        // Formule: 0.15 + ((sliderValue - 58) * 0.84 / 42)
+        return 0.15 + ((sliderValue - 58) * 0.84 / 42);
+    }
+}
+
 function updateSymmetricEval() {
-    // Récupérer les valeurs (15-42 pour négatif, 58-99 pour positif)
-    const leftValue = parseInt(evalMinSlider.value); // 15 à 42
-    const rightValue = parseInt(evalMaxSlider.value); // 58 à 99
+    const leftValue = parseInt(evalMinSlider.value); // 0 à 42
+    const rightValue = parseInt(evalMaxSlider.value); // 58 à 100
     
-    // Convertir en valeurs d'évaluation (-0.99 à -0.15 et +0.15 à +0.99)
-    const leftEval = -(leftValue / 100);
-    const rightEval = rightValue / 100;
+    // Convertir en valeurs d'évaluation
+    const leftEval = convertSliderToEval(leftValue, true);
+    const rightEval = convertSliderToEval(rightValue, false);
     
     // Affichage
-    evalRangeValue.textContent = `${leftEval.toFixed(2)} / ${rightEval.toFixed(2)}`;
+    evalRangeValue.textContent = `${leftEval.toFixed(2)} / +${rightEval.toFixed(2)}`;
     evalMinDisplay.textContent = leftEval.toFixed(2);
     evalMaxDisplay.textContent = `+${rightEval.toFixed(2)}`;
     
@@ -1043,18 +1067,16 @@ function updateSymmetricEval() {
 }
 
 function updateActiveZones(leftValue, rightValue) {
-    // Conversion des valeurs en pourcentages de position
-    // leftValue: 15-42 → positions 0% à 42.5% (juste avant la zone bloquée)
-    // rightValue: 58-99 → positions 57.5% à 100% (juste après la zone bloquée)
+    // leftValue: 0-42 → 0% à 42%
+    // rightValue: 58-100 → 58% à 100%
     
-    const leftPercent = (leftValue / 100) * 100; // 15% à 42%
-    const rightPercent = (rightValue / 100) * 100; // 58% à 99%
+    const leftPercent = leftValue; // directement en %
+    const rightPercent = rightValue; // directement en %
     
-    // Zone active gauche: de 0% à leftPercent%
-    activeZoneLeft.style.left = '0%';
+    // Zone active gauche: de 0% jusqu'à la position du curseur gauche
     activeZoneLeft.style.width = leftPercent + '%';
     
-    // Zone active droite: de rightPercent% jusqu'à 100%
+    // Zone active droite: de la position du curseur droit jusqu'à 100%
     activeZoneRight.style.left = rightPercent + '%';
     activeZoneRight.style.width = (100 - rightPercent) + '%';
 }
@@ -1064,10 +1086,6 @@ evalMaxSlider.addEventListener('input', updateSymmetricEval);
 
 // Initialisation
 updateSymmetricEval();
-
-evalMaxSlider.addEventListener('input', (e) => {
-    updateSymmetricEval(e.target);
-});
 
 // Initialisation
 updateSymmetricEval(evalMaxSlider);
@@ -1129,14 +1147,27 @@ function resetFilters() {
         // Gestionnaire du bouton de génération
 generateBtn.addEventListener('click', async () => {
     // Récupérer les valeurs des deux curseurs
-const leftValue = parseInt(document.getElementById('evalMinSlider').value);
-const rightValue = parseInt(document.getElementById('evalMaxSlider').value);
+const leftSliderValue = parseInt(document.getElementById('evalMinSlider').value); // 0-42
+const rightSliderValue = parseInt(document.getElementById('evalMaxSlider').value); // 58-100
 
-// Convertir en centipawns (valeurs négatives et positives)
-const negativeMin = -99; // Toujours -0.99
-const negativeMax = -leftValue; // -0.42 à -0.15
-const positiveMin = rightValue; // +0.15 à +0.42
-const positiveMax = 99; // Toujours +0.99
+// Fonction de conversion
+function sliderToEval(value, isNegative) {
+    if (isNegative) {
+        return -0.99 + (value * 0.84 / 42);
+    } else {
+        return 0.15 + ((value - 58) * 0.84 / 42);
+    }
+}
+
+// Convertir en valeurs d'évaluation
+const negativeThreshold = sliderToEval(leftSliderValue, true); // -0.99 à -0.15
+const positiveThreshold = sliderToEval(rightSliderValue, false); // +0.15 à +0.99
+
+// Convertir en centipawns pour l'API
+const negativeMin = -99;
+const negativeMax = Math.round(negativeThreshold * 100);
+const positiveMin = Math.round(positiveThreshold * 100);
+const positiveMax = 99;
 
 if (evalMin < -14) {
     negativeMin = evalMin;
