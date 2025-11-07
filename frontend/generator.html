@@ -852,14 +852,12 @@ header {
         <h3 class="sliders-title">Advanced settings</h3>
         
         <div class="control-group control-full-width">
-            <!-- Range négatif -->
-            <!-- Range unifié -->
+        
+<!-- Range unifié symétrique -->
 <div>
     <div style="text-align: center; margin-bottom: 10px;">
-        <small style="color: #999;">Plage d'évaluation : de </small>
-        <span id="evalMinValue" style="font-weight: 600;">-0.99</span>
-        <small style="color: #999;"> à </small>
-        <span id="evalMaxValue" style="font-weight: 600;">+0.99</span>
+        <small style="color: #999;">Plage d'évaluation symétrique : </small>
+        <span id="evalRangeValue" style="font-weight: 600; font-size: 1.2em;">±0.99</span>
     </div>
     <div class="range-container" style="position: relative; height: 60px;">
         <!-- Track visuel avec zone bloquée -->
@@ -871,19 +869,31 @@ header {
             #4caf50 75.5%, 
             #4caf50 100%);">
         </div>
-        <!-- Zone bloquée grisée -->
+        
+        <!-- Zone active (symétrique des 2 côtés) -->
+        <div id="activeZone" style="position: absolute; height: 8px; top: 26px; background: #667eea; opacity: 0.6; border-radius: 5px;"></div>
+        
+        <!-- Zone bloquée centrale grisée -->
         <div style="position: absolute; width: 51%; left: 24.5%; height: 8px; top: 26px; background: repeating-linear-gradient(
             45deg,
             #ccc,
             #ccc 5px,
             #ddd 5px,
             #ddd 10px
-        ); opacity: 0.8; border-radius: 5px;"></div>
+        ); opacity: 0.8; border-radius: 5px; z-index: 2;"></div>
         
-        <input type="range" id="evalMin" min="-99" max="99" value="-99" step="1" 
+        <!-- Curseur gauche (négatif) -->
+        <input type="range" id="evalMin" min="15" max="99" value="99" step="1" 
+               class="range-slider" style="position: absolute; width: 100%; pointer-events: none; transform: scaleX(-1);">
+        
+        <!-- Curseur droit (positif) -->
+        <input type="range" id="evalMax" min="15" max="99" value="99" step="1" 
                class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
-        <input type="range" id="evalMax" min="-99" max="99" value="99" step="1" 
-               class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+    </div>
+    <div style="text-align: center; margin-top: 10px; font-size: 0.85em; color: #666;">
+        <span id="evalMinDisplay">-0.99</span> 
+        <span style="margin: 0 20px;">⟷</span>
+        <span id="evalMaxDisplay">+0.99</span>
     </div>
 </div>
     
@@ -1017,76 +1027,87 @@ learnMoreBtn.addEventListener('click', () => {
         learnMoreText.textContent = 'Learn more ▼';
     }
 });
-    // Gestion des sliders
-// Gestion des 4 sliders d'évaluation
-// Gestion du slider unifié d'évaluation
+    // Gestion du slider symétrique d'évaluation
 const evalMinSlider = document.getElementById('evalMin');
 const evalMaxSlider = document.getElementById('evalMax');
-const evalMinValue = document.getElementById('evalMinValue');
-const evalMaxValue = document.getElementById('evalMaxValue');
+const evalRangeValue = document.getElementById('evalRangeValue');
+const evalMinDisplay = document.getElementById('evalMinDisplay');
+const evalMaxDisplay = document.getElementById('evalMaxDisplay');
+const activeZone = document.getElementById('activeZone');
 
-function updateEvalDisplay() {
-    let min = parseInt(evalMinSlider.value);
-    let max = parseInt(evalMaxSlider.value);
+let isUpdating = false; // Pour éviter les boucles infinies
+
+function updateSymmetricEval(changedSlider) {
+    if (isUpdating) return;
+    isUpdating = true;
     
-    evalMinValue.textContent = (min / 100).toFixed(2);
-    evalMaxValue.textContent = (max >= 0 ? '+' : '') + (max / 100).toFixed(2);
+    let value = parseInt(changedSlider.value);
+    
+    // Les deux sliders ont la même valeur (symétrique)
+    evalMinSlider.value = value;
+    evalMaxSlider.value = value;
+    
+    // Affichage
+    const displayValue = (value / 100).toFixed(2);
+    evalRangeValue.textContent = `±${displayValue}`;
+    evalMinDisplay.textContent = `-${displayValue}`;
+    evalMaxDisplay.textContent = `+${displayValue}`;
     
     // Coloration conditionnelle
-    evalMinValue.style.color = min < -14 ? '#f44336' : '#999';
-    evalMaxValue.style.color = max > 14 ? '#4caf50' : '#999';
+    if (value > 14) {
+        evalRangeValue.style.color = '#667eea';
+    } else {
+        evalRangeValue.style.color = '#999';
+    }
+    
+    // Mettre à jour la zone active visuelle
+    updateActiveZone(value);
+    
+    isUpdating = false;
 }
 
-function enforceEvalConstraints() {
-    let min = parseInt(evalMinSlider.value);
-    let max = parseInt(evalMaxSlider.value);
-    let changed = false;
+function updateActiveZone(value) {
+    // Calculer la position de la zone active
+    // value va de 15 à 99
+    // En pourcentage : 15 = 75.5% (limite droite de zone bloquée)
+    //                  99 = 100%
     
-    // Si min est dans la zone interdite [-14, 14], le pousser à -15
-    if (min >= -14 && min <= 14) {
-        min = -15;
-        evalMinSlider.value = min;
-        changed = true;
-    }
+    const minPercent = 100 - (value / 99 * 100); // Position gauche (inversée)
+    const maxPercent = (value / 99 * 100); // Position droite
     
-    // Si max est dans la zone interdite [-14, 14], le pousser à 15
-    if (max >= -14 && max <= 14) {
-        max = 15;
-        evalMaxSlider.value = max;
-        changed = true;
-    }
+    // La zone active va de minPercent% à 24.5% (gauche) 
+    // et de 75.5% à maxPercent% (droite)
     
-    // S'assurer que min < max avec la contrainte de la zone bloquée
-    if (min >= max) {
-        if (min > 14) {
-            // Si on est du côté positif, forcer max au-dessus
-            max = Math.max(min + 1, 15);
-            evalMaxSlider.value = max;
-        } else {
-            // Si on est du côté négatif, forcer min en dessous
-            min = Math.min(max - 1, -15);
-            evalMinSlider.value = min;
+    if (value >= 15) {
+        const leftWidth = 24.5 - minPercent;
+        const rightWidth = maxPercent - 75.5;
+        
+        // Créer deux zones actives
+        activeZone.style.left = minPercent + '%';
+        activeZone.style.width = leftWidth + '%';
+        
+        // Ajouter une deuxième zone pour le côté droit
+        if (!document.getElementById('activeZoneRight')) {
+            const rightZone = activeZone.cloneNode();
+            rightZone.id = 'activeZoneRight';
+            activeZone.parentNode.appendChild(rightZone);
         }
-        changed = true;
-    }
-    
-    if (changed) {
-        updateEvalDisplay();
+        const rightZone = document.getElementById('activeZoneRight');
+        rightZone.style.left = '75.5%';
+        rightZone.style.width = rightWidth + '%';
     }
 }
 
-evalMinSlider.addEventListener('input', () => {
-    enforceEvalConstraints();
-    updateEvalDisplay();
+evalMinSlider.addEventListener('input', (e) => {
+    updateSymmetricEval(e.target);
 });
 
-evalMaxSlider.addEventListener('input', () => {
-    enforceEvalConstraints();
-    updateEvalDisplay();
+evalMaxSlider.addEventListener('input', (e) => {
+    updateSymmetricEval(e.target);
 });
 
 // Initialisation
-updateEvalDisplay();
+updateSymmetricEval(evalMaxSlider);
 
 // Update écart matériel
 materialDiffSlider.addEventListener('input', () => {
@@ -1144,14 +1165,13 @@ function resetFilters() {
 
         // Gestionnaire du bouton de génération
 generateBtn.addEventListener('click', async () => {
-    const evalMin = parseInt(document.getElementById('evalMin').value);
-const evalMax = parseInt(document.getElementById('evalMax').value);
+    const evalRange = parseInt(document.getElementById('evalMax').value);
 
-// Convertir en negative/positive pour l'API
-let negativeMin = -99;
-let negativeMax = -15;
-let positiveMin = 15;
-let positiveMax = 99;
+// Les valeurs sont symétriques
+const negativeMin = -evalRange;
+const negativeMax = -15;
+const positiveMin = 15;
+const positiveMax = evalRange;
 
 if (evalMin < -14) {
     negativeMin = evalMin;
@@ -1167,13 +1187,13 @@ if (evalMax > 14) {
     const maxAttempts = 10000; // ← MODIFIER CETTE LIGNE (supprimer le getElementById)
 
     // Validations
-if (evalMin >= -14 && evalMin <= 14) {
-    showStatus('Erreur: La valeur minimum ne peut pas être dans la zone [-0.14, +0.14]', 'error');
+if (evalRange < 15) {
+    showStatus('Erreur: La plage d\'évaluation doit être au minimum ±0.15', 'error');
     return;
 }
 
-if (evalMax >= -14 && evalMax <= 14) {
-    showStatus('Erreur: La valeur maximum ne peut pas être dans la zone [-0.14, +0.14]', 'error');
+if (evalRange > 99) {
+    showStatus('Erreur: La plage d\'évaluation doit être au maximum ±0.99', 'error');
     return;
 }
 
