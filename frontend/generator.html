@@ -47,7 +47,7 @@
 
 header {
     position: relative;
-    padding-bottom: 10px;
+    padding-bottom: 30px;
 }
 
         header h1 {
@@ -849,41 +849,43 @@ header {
 <div class="controls">
     <!-- Encadré pour les sliders d'évaluation -->
     <div class="sliders-box">
-        <h3 class="sliders-title">🎯 Plage d'évaluation</h3>
+        <h3 class="sliders-title">Advanced settings</h3>
         
         <div class="control-group control-full-width">
             <!-- Range négatif -->
-            <div style="margin-bottom: 25px;">
-                <div style="text-align: center; margin-bottom: 10px;">
-                    <small style="color: #999;">Désavantage blanc: de </small>
-                    <span id="negativeMinValue" style="color: #f44336; font-weight: 600;">-0.99</span>
-                    <small style="color: #999;"> à </small>
-                    <span id="negativeMaxValue" style="color: #f44336; font-weight: 600;">-0.15</span>
-                </div>
-                <div class="range-container" style="position: relative; height: 40px;">
-                    <input type="range" id="negativeMin" min="-99" max="-15" value="-99" step="1" 
-                           class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
-                    <input type="range" id="negativeMax" min="-99" max="-15" value="-15" step="1" 
-                           class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
-                </div>
-            </div>
-            
-            <!-- Range positif -->
-            <div>
-                <div style="text-align: center; margin-bottom: 10px;">
-                    <small style="color: #999;">Avantage blanc: de </small>
-                    <span id="positiveMinValue" style="color: #4caf50; font-weight: 600;">+0.15</span>
-                    <small style="color: #999;"> à </small>
-                    <span id="positiveMaxValue" style="color: #4caf50; font-weight: 600;">+0.99</span>
-                </div>
-                <div class="range-container" style="position: relative; height: 40px;">
-                    <input type="range" id="positiveMin" min="15" max="99" value="15" step="1" 
-                           class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
-                    <input type="range" id="positiveMax" min="15" max="99" value="99" step="1" 
-                           class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
-                </div>
-            </div>
+            <!-- Range unifié -->
+<div>
+    <div style="text-align: center; margin-bottom: 10px;">
+        <small style="color: #999;">Plage d'évaluation : de </small>
+        <span id="evalMinValue" style="font-weight: 600;">-0.99</span>
+        <small style="color: #999;"> à </small>
+        <span id="evalMaxValue" style="font-weight: 600;">+0.99</span>
+    </div>
+    <div class="range-container" style="position: relative; height: 60px;">
+        <!-- Track visuel avec zone bloquée -->
+        <div style="position: absolute; width: 100%; height: 8px; top: 26px; border-radius: 5px; background: linear-gradient(to right, 
+            #f44336 0%, 
+            #f44336 24.5%, 
+            #e0e0e0 24.5%, 
+            #e0e0e0 75.5%, 
+            #4caf50 75.5%, 
+            #4caf50 100%);">
         </div>
+        <!-- Zone bloquée grisée -->
+        <div style="position: absolute; width: 51%; left: 24.5%; height: 8px; top: 26px; background: repeating-linear-gradient(
+            45deg,
+            #ccc,
+            #ccc 5px,
+            #ddd 5px,
+            #ddd 10px
+        ); opacity: 0.8; border-radius: 5px;"></div>
+        
+        <input type="range" id="evalMin" min="-99" max="99" value="-99" step="1" 
+               class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+        <input type="range" id="evalMax" min="-99" max="99" value="99" step="1" 
+               class="range-slider" style="position: absolute; width: 100%; pointer-events: none;">
+    </div>
+</div>
     
     <!-- Écart matériel et Matériel max sur la même ligne -->
 <div class="control-group control-full-width material-sliders-section">
@@ -1015,74 +1017,74 @@ learnMoreBtn.addEventListener('click', () => {
 });
     // Gestion des sliders
 // Gestion des 4 sliders d'évaluation
-const negativeMinSlider = document.getElementById('negativeMin');
-const negativeMaxSlider = document.getElementById('negativeMax');
-const positiveMinSlider = document.getElementById('positiveMin');
-const positiveMaxSlider = document.getElementById('positiveMax');
+// Gestion du slider unifié d'évaluation
+const evalMinSlider = document.getElementById('evalMin');
+const evalMaxSlider = document.getElementById('evalMax');
+const evalMinValue = document.getElementById('evalMinValue');
+const evalMaxValue = document.getElementById('evalMaxValue');
 
-const negativeMinValue = document.getElementById('negativeMinValue');
-const negativeMaxValue = document.getElementById('negativeMaxValue');
-const positiveMinValue = document.getElementById('positiveMinValue');
-const positiveMaxValue = document.getElementById('positiveMaxValue');
-
-const materialDiffSlider = document.getElementById('materialDiff');
-const materialDiffValue = document.getElementById('materialDiffValue');
-const maxMaterialSlider = document.getElementById('maxMaterial');
-const maxMaterialValue = document.getElementById('maxMaterialValue');
-
-// Update sliders négatifs
-negativeMinSlider.addEventListener('input', () => {
-    let min = parseInt(negativeMinSlider.value);
-    let max = parseInt(negativeMaxSlider.value);
+function updateEvalDisplay() {
+    let min = parseInt(evalMinSlider.value);
+    let max = parseInt(evalMaxSlider.value);
     
-    if (min > max) {
-        negativeMaxSlider.value = min;
-        max = min;
+    evalMinValue.textContent = (min / 100).toFixed(2);
+    evalMaxValue.textContent = (max >= 0 ? '+' : '') + (max / 100).toFixed(2);
+    
+    // Coloration conditionnelle
+    evalMinValue.style.color = min < -14 ? '#f44336' : '#999';
+    evalMaxValue.style.color = max > 14 ? '#4caf50' : '#999';
+}
+
+function enforceEvalConstraints() {
+    let min = parseInt(evalMinSlider.value);
+    let max = parseInt(evalMaxSlider.value);
+    let changed = false;
+    
+    // Si min est dans la zone interdite [-14, 14], le pousser à -15
+    if (min >= -14 && min <= 14) {
+        min = -15;
+        evalMinSlider.value = min;
+        changed = true;
     }
     
-    negativeMinValue.textContent = (min / 100).toFixed(2);
-    negativeMaxValue.textContent = (max / 100).toFixed(2);
-});
-
-negativeMaxSlider.addEventListener('input', () => {
-    let min = parseInt(negativeMinSlider.value);
-    let max = parseInt(negativeMaxSlider.value);
-    
-    if (max < min) {
-        negativeMinSlider.value = max;
-        min = max;
+    // Si max est dans la zone interdite [-14, 14], le pousser à 15
+    if (max >= -14 && max <= 14) {
+        max = 15;
+        evalMaxSlider.value = max;
+        changed = true;
     }
     
-    negativeMinValue.textContent = (min / 100).toFixed(2);
-    negativeMaxValue.textContent = (max / 100).toFixed(2);
-});
-
-// Update sliders positifs
-positiveMinSlider.addEventListener('input', () => {
-    let min = parseInt(positiveMinSlider.value);
-    let max = parseInt(positiveMaxSlider.value);
-    
-    if (min > max) {
-        positiveMaxSlider.value = min;
-        max = min;
+    // S'assurer que min < max avec la contrainte de la zone bloquée
+    if (min >= max) {
+        if (min > 14) {
+            // Si on est du côté positif, forcer max au-dessus
+            max = Math.max(min + 1, 15);
+            evalMaxSlider.value = max;
+        } else {
+            // Si on est du côté négatif, forcer min en dessous
+            min = Math.min(max - 1, -15);
+            evalMinSlider.value = min;
+        }
+        changed = true;
     }
     
-    positiveMinValue.textContent = '+' + (min / 100).toFixed(2);
-    positiveMaxValue.textContent = '+' + (max / 100).toFixed(2);
+    if (changed) {
+        updateEvalDisplay();
+    }
+}
+
+evalMinSlider.addEventListener('input', () => {
+    enforceEvalConstraints();
+    updateEvalDisplay();
 });
 
-positiveMaxSlider.addEventListener('input', () => {
-    let min = parseInt(positiveMinSlider.value);
-    let max = parseInt(positiveMaxSlider.value);
-    
-    if (max < min) {
-        positiveMinSlider.value = max;
-        min = max;
-    }
-    
-    positiveMinValue.textContent = '+' + (min / 100).toFixed(2);
-    positiveMaxValue.textContent = '+' + (max / 100).toFixed(2);
+evalMaxSlider.addEventListener('input', () => {
+    enforceEvalConstraints();
+    updateEvalDisplay();
 });
+
+// Initialisation
+updateEvalDisplay();
 
 // Update écart matériel
 materialDiffSlider.addEventListener('input', () => {
@@ -1140,42 +1142,41 @@ function resetFilters() {
 
         // Gestionnaire du bouton de génération
 generateBtn.addEventListener('click', async () => {
-    const negativeMin = parseInt(document.getElementById('negativeMin').value);
-    const negativeMax = parseInt(document.getElementById('negativeMax').value);
-    const positiveMin = parseInt(document.getElementById('positiveMin').value);
-    const positiveMax = parseInt(document.getElementById('positiveMax').value);
+    const evalMin = parseInt(document.getElementById('evalMin').value);
+const evalMax = parseInt(document.getElementById('evalMax').value);
+
+// Convertir en negative/positive pour l'API
+let negativeMin = -99;
+let negativeMax = -15;
+let positiveMin = 15;
+let positiveMax = 99;
+
+if (evalMin < -14) {
+    negativeMin = evalMin;
+    negativeMax = Math.min(evalMax, -15);
+}
+
+if (evalMax > 14) {
+    positiveMin = Math.max(evalMin, 15);
+    positiveMax = evalMax;
+}
     const materialDiff = parseInt(document.getElementById('materialDiff').value);
     const maxMaterial = parseInt(document.getElementById('maxMaterial').value);
     const maxAttempts = 10000; // ← MODIFIER CETTE LIGNE (supprimer le getElementById)
 
     // Validations
-if (negativeMin < -99 || negativeMin > -15) {
-    showStatus('Erreur: Range négatif invalide', 'error');
+if (evalMin >= -14 && evalMin <= 14) {
+    showStatus('Erreur: La valeur minimum ne peut pas être dans la zone [-0.14, +0.14]', 'error');
     return;
 }
 
-if (negativeMax < -99 || negativeMax > -15) {
-    showStatus('Erreur: Range négatif invalide', 'error');
+if (evalMax >= -14 && evalMax <= 14) {
+    showStatus('Erreur: La valeur maximum ne peut pas être dans la zone [-0.14, +0.14]', 'error');
     return;
 }
 
-if (negativeMin > negativeMax) {
-    showStatus('Erreur: Min négatif doit être inférieur au max négatif', 'error');
-    return;
-}
-
-if (positiveMin < 15 || positiveMin > 99) {
-    showStatus('Erreur: Range positif invalide', 'error');
-    return;
-}
-
-if (positiveMax < 15 || positiveMax > 99) {
-    showStatus('Erreur: Range positif invalide', 'error');
-    return;
-}
-
-if (positiveMin > positiveMax) {
-    showStatus('Erreur: Min positif doit être inférieur au max positif', 'error');
+if (evalMin >= evalMax) {
+    showStatus('Erreur: La valeur minimum doit être inférieure à la valeur maximum', 'error');
     return;
 }
     
