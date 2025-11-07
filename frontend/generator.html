@@ -904,7 +904,7 @@ header {
             border: 1px solid #999;">
         </div>
         
-        <!-- Zone bloquée centrale (-0.15 à +0.15 = 42.5% à 57.5%) -->
+        <!-- Zone bloquée centrale (-0.15 à +0.15) -->
         <div style="position: absolute; left: 42.5%; width: 15%; height: 8px; top: 26px; 
             background: repeating-linear-gradient(
                 45deg,
@@ -918,29 +918,13 @@ header {
             border: 1px solid #666;">
         </div>
         
-        <!-- Zone active gauche (négative) - de 0% jusqu'au curseur gauche -->
-        <div id="activeZoneLeft" style="position: absolute; height: 8px; top: 26px; 
-            background: rgba(102, 126, 234, 0.5); 
-            z-index: 1; 
-            left: 0%;
-            border-radius: 5px 0 0 5px;">
-        </div>
-        
-        <!-- Zone active droite (positive) - du curseur droit jusqu'à 100% -->
-        <div id="activeZoneRight" style="position: absolute; height: 8px; top: 26px; 
-            background: rgba(102, 126, 234, 0.5); 
-            z-index: 1;
-            right: 0%;
-            border-radius: 0 5px 5px 0;">
-        </div>
-        
-        <!-- Curseur GAUCHE (négatif) : 0 à 42 = -0.99 à -0.15 -->
-        <input type="range" id="evalMinSlider" min="0" max="42" value="0" step="1" 
+        <!-- Curseur GAUCHE (négatif) : -0.99 à -0.15 -->
+        <input type="range" id="evalMinSlider" min="-99" max="-15" value="-99" step="1" 
                class="range-slider" 
                style="position: absolute; width: 100%; z-index: 4;">
         
-        <!-- Curseur DROIT (positif) : 58 à 100 = +0.15 à +0.99 -->
-        <input type="range" id="evalMaxSlider" min="58" max="100" value="100" step="1" 
+        <!-- Curseur DROIT (positif) : +0.15 à +0.99 -->
+        <input type="range" id="evalMaxSlider" min="15" max="99" value="99" step="1" 
                class="range-slider" 
                style="position: absolute; width: 100%; z-index: 5;">
     </div>
@@ -1087,51 +1071,19 @@ const evalMaxSlider = document.getElementById('evalMaxSlider');
 const evalRangeValue = document.getElementById('evalRangeValue');
 const evalMinDisplay = document.getElementById('evalMinDisplay');
 const evalMaxDisplay = document.getElementById('evalMaxDisplay');
-const activeZoneLeft = document.getElementById('activeZoneLeft');
-const activeZoneRight = document.getElementById('activeZoneRight');
-
-function convertSliderToEval(sliderValue, isNegative) {
-    if (isNegative) {
-        // 0 à 42 → -0.99 à -0.15
-        // Formule: -0.99 + (sliderValue * 0.84 / 42)
-        return -0.99 + (sliderValue * 0.84 / 42);
-    } else {
-        // 58 à 100 → +0.15 à +0.99
-        // Formule: 0.15 + ((sliderValue - 58) * 0.84 / 42)
-        return 0.15 + ((sliderValue - 58) * 0.84 / 42);
-    }
-}
 
 function updateSymmetricEval() {
-    const leftValue = parseInt(evalMinSlider.value); // 0 à 42
-    const rightValue = parseInt(evalMaxSlider.value); // 58 à 100
+    const leftValue = parseInt(evalMinSlider.value); // -99 à -15
+    const rightValue = parseInt(evalMaxSlider.value); // 15 à 99
     
     // Convertir en valeurs d'évaluation
-    const leftEval = convertSliderToEval(leftValue, true);
-    const rightEval = convertSliderToEval(rightValue, false);
+    const leftEval = leftValue / 100;
+    const rightEval = rightValue / 100;
     
     // Affichage
     evalRangeValue.textContent = `${leftEval.toFixed(2)} / +${rightEval.toFixed(2)}`;
     evalMinDisplay.textContent = leftEval.toFixed(2);
     evalMaxDisplay.textContent = `+${rightEval.toFixed(2)}`;
-    
-    // Mettre à jour les zones actives visuelles
-    updateActiveZones(leftValue, rightValue);
-}
-
-function updateActiveZones(leftValue, rightValue) {
-    // leftValue: 0-42 → 0% à 42%
-    // rightValue: 58-100 → 58% à 100%
-    
-    const leftPercent = leftValue; // directement en %
-    const rightPercent = rightValue; // directement en %
-    
-    // Zone active gauche: de 0% jusqu'à la position du curseur gauche
-    activeZoneLeft.style.width = leftPercent + '%';
-    
-    // Zone active droite: de la position du curseur droit jusqu'à 100%
-    activeZoneRight.style.left = rightPercent + '%';
-    activeZoneRight.style.width = (100 - rightPercent) + '%';
 }
 
 evalMinSlider.addEventListener('input', updateSymmetricEval);
@@ -1199,18 +1151,15 @@ function resetFilters() {
 
         // Gestionnaire du bouton de génération
 generateBtn.addEventListener('click', async () => {
-    // Récupérer les valeurs des deux curseurs
-const leftSliderValue = parseInt(document.getElementById('evalMinSlider').value); // 0-42
-const rightSliderValue = parseInt(document.getElementById('evalMaxSlider').value); // 58-100
+    // Récupérer les valeurs directement en centipawns
+    const negativeMin = -99;
+    const negativeMax = parseInt(document.getElementById('evalMinSlider').value);
+    const positiveMin = parseInt(document.getElementById('evalMaxSlider').value);
+    const positiveMax = 99;
 
-// Fonction de conversion
-function sliderToEval(value, isNegative) {
-    if (isNegative) {
-        return -0.99 + (value * 0.84 / 42);
-    } else {
-        return 0.15 + ((value - 58) * 0.84 / 42);
-    }
-}
+    const materialDiff = parseInt(document.getElementById('materialDiff').value);
+    const maxMaterial = parseInt(document.getElementById('maxMaterial').value);
+    const maxAttempts = 10000;
 
 // Convertir en valeurs d'évaluation
 const negativeThreshold = sliderToEval(leftSliderValue, true); // -0.99 à -0.15
