@@ -1165,12 +1165,6 @@ generateBtn.addEventListener('click', async () => {
 const negativeThreshold = sliderToEval(leftSliderValue, true); // -0.99 à -0.15
 const positiveThreshold = sliderToEval(rightSliderValue, false); // +0.15 à +0.99
 
-// Convertir en centipawns pour l'API
-const negativeMin = -99;
-const negativeMax = Math.round(negativeThreshold * 100);
-const positiveMin = Math.round(positiveThreshold * 100);
-const positiveMax = 99;
-
 if (evalMin < -14) {
     negativeMin = evalMin;
     negativeMax = Math.min(evalMax, -15);
