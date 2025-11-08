@@ -100,10 +100,12 @@ header {
 
 .control-row .range-values {
     min-width: 140px;
-    text-align: right;
-    margin-top: 0;
+    text-align: center;
+    margin-top: 5px;
     flex-shrink: 0;
-    color: white;
+    color: #667eea;
+    font-weight: 600;
+    font-size: 1.1em;
 }
 
 .range-values-top {
@@ -124,6 +126,40 @@ header {
     display: flex;
     gap: 15px;
     width: 100%;
+}
+
+.advanced-settings-container {
+    background: white;
+    border: 2px solid #667eea;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.advanced-settings-title {
+    color: #667eea;
+    font-size: 1.3em;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.slider-with-value {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.slider-with-value .range-container {
+    position: relative;
+}
+
+.slider-with-value .range-values {
+    text-align: center;
+    margin-top: 5px;
+    color: #667eea;
+    font-weight: 600;
+    font-size: 1.1em;
 }
 
 .control-half {
@@ -835,20 +871,38 @@ header {
 <div class="controls">
    
     
-    <!-- Écart matériel et Matériel max sur la même ligne -->
-<div class="control-group control-full-width material-sliders-section">
-        <div class="control-row-split">
-            <!-- Écart matériel -->
-            <div class="control-half">
-                <div class="control-row">
-                    <label for="materialDiff">Écart matériel min:</label>
-                    <div class="range-container">
-                        <input type="range" id="materialDiff" min="0" max="6" value="3" step="1" class="range-slider">
-                    </div>
-                    <div class="range-values">
-                        <span id="materialDiffValue">3</span>
-                    </div>
+    <!-- Advanced Settings Encadré -->
+<div class="advanced-settings-container">
+    <div class="advanced-settings-title">⚙️ Advanced Settings</div>
+    
+    <div class="control-row-split">
+        <!-- Écart matériel -->
+        <div class="control-half">
+            <label for="materialDiff">Material difference (min):</label>
+            <div class="slider-with-value">
+                <div class="range-container">
+                    <input type="range" id="materialDiff" min="0" max="6" value="3" step="1" class="range-slider">
                 </div>
+                <div class="range-values">
+                    <span id="materialDiffValue">3</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Matériel max -->
+        <div class="control-half">
+            <label for="maxMaterial">Max material/side:</label>
+            <div class="slider-with-value">
+                <div class="range-container">
+                    <input type="range" id="maxMaterial" min="10" max="25" value="22" step="1" class="range-slider">
+                </div>
+                <div class="range-values">
+                    <span id="maxMaterialValue">22</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
             </div>
             
             <!-- Matériel max -->
