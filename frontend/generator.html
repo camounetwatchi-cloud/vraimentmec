@@ -527,13 +527,26 @@ header {
 }
 
 .range-slider-dual::-webkit-slider-runnable-track {
-    background: linear-gradient(to right, 
-        #e0e0e0 0%, 
-        #e0e0e0 var(--min-percent), 
-        #667eea var(--min-percent), 
-        #667eea var(--max-percent), 
-        #e0e0e0 var(--max-percent), 
-        #e0e0e0 100%);
+  /* Nous utilisons deux couches de background (la première est au-dessus) */
+  background:
+    /* * COUCHE 1 (Dessus) : Les parties "inactives".
+     * Nous utilisons la couleur claire (#C6CDF0) pour les côtés,
+     * et 'transparent' pour la zone active afin de voir la couche 2.
+     */
+    linear-gradient(to right,
+      #C6CDF0 0%,
+      #C6CDF0 var(--min-percent),
+      transparent var(--min-percent),
+      transparent var(--max-percent),
+      #C6CDF0 var(--max-percent),
+      #C6CDF0 100%
+    ),
+    
+    /* * COUCHE 2 (Dessous) : Votre dégradé complet.
+     * Il s'étend sur toute la largeur et n'est visible 
+     * que là où la couche 1 est transparente.
+     */
+    linear-gradient(to right, #C6CDF0, #0F1638);
 }
 
 .range-slider-dual:nth-of-type(1)::-webkit-slider-thumb {
