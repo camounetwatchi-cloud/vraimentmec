@@ -1613,19 +1613,8 @@ socket.on('challenge_accepted', (data) => {
     if (currentUser && (data.challenger_id === currentUser.id || data.accepter_id === currentUser.id)) {
         console.log('🎮 Vous êtes impliqué dans ce défi !');
         
-        const isChallenger = data.challenger_id === currentUser.id;
-        playerColor = isChallenger ? data.challenger_color : data.accepter_color;
-        
-        startGame({
-            game_id: data.game_id,
-            challenge_id: data.challenge_id,
-            color: playerColor,
-            fen: data.fen,
-            time_control: data.time_control,
-            opponent: {
-                username: isChallenger ? data.accepter_name : data.challenger_name
-            }
-        });
+        // Ouvrir le modal d'auction
+        openColorAuctionModal(data);
     }
     
     loadChallenges();
@@ -1642,10 +1631,9 @@ socket.on('challenge_accepted', (data) => {
             });
         }
 
-socket.on('auction_vote_update', (data) => {
+        socket.on('auction_vote_update', (data) => {
     console.log('📊 Vote reçu:', data);
     
-    // Mettre à jour l'affichage des votes
     if (data.player1_vote) {
         document.getElementById('auctionPlayer1Vote').textContent = 
             data.player1_vote === 'white' ? '⚪ Blanc' : '⚫ Noir';
@@ -1662,12 +1650,10 @@ socket.on('auction_vote_update', (data) => {
         auctionData.player2Vote = data.player2_vote;
     }
     
-    // Si conflit, afficher la section d'enchères
     if (data.conflict) {
         document.getElementById('colorSelectionSection').style.display = 'none';
         document.getElementById('auctionBidSection').style.display = 'block';
         
-        // Initialiser l'enchère avec le temps de contrôle par défaut
         const timeControl = auctionData.challengeData.time_control;
         document.getElementById('bidMinutes').value = timeControl.minutes;
         document.getElementById('bidSeconds').value = 0;
@@ -1684,7 +1670,6 @@ socket.on('auction_bid_update', (data) => {
     document.getElementById('currentBidTime').textContent = 
         `${minutes}:${seconds.toString().padStart(2, '0')}`;
     
-    // Mettre à jour les données locales
     if (data.bidder_id === auctionData.challengeData.challenger_id) {
         auctionData.player1Bid = data.bid_time;
     } else {
@@ -1697,7 +1682,6 @@ socket.on('auction_resolved', (data) => {
     
     closeColorAuctionModal();
     
-    // Démarrer la partie avec les couleurs assignées
     const isChallenger = data.challenger_id === currentUser.id;
     playerColor = isChallenger ? data.challenger_color : data.accepter_color;
     
@@ -1713,6 +1697,7 @@ socket.on('auction_resolved', (data) => {
         }
     });
 });
+
 
         function startGame(data) {
             gameMode = 'game';
