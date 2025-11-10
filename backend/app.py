@@ -662,6 +662,175 @@ def handle_accept_draw(data):
         print(f"❌ Erreur dans accept_draw: {e}")
         emit('error', {'message': 'Erreur lors de l\'acceptation de la nulle'})
 
+@socketio.on('auction_vote')
+def handle_auction_vote(data):
+    try:
+        game_id = data.get('game_id')
+        color = data.get('color')
+        user_id = session.get('user_id')
+        
+        if not game_id or not color or not user_id:
+            emit('error', {'message': 'Données manquantes'})
+            return
+        
+        if not hasattr(app, 'pending_games') or game_id not in app.pending_games:
+            emit('error', {'message': 'Partie introuvable'})
+            return
+        
+        game_info = app.pending_games[game_id]
+        
+        # Enregistrer le vote
+        is_challenger = user_id == game_info['challenger_id']
+        if is_challenger:
+            game_info['player1_vote'] = color
+        else:
+            game_info['player2_vote'] = color
+        
+        # Vérifier s'il y a conflit
+        conflict = False
+        if 'player1_vote' in game_info and 'player2_vote' in game_info:
+            conflict = game_info['player1_vote'] == game_info['player2_vote']
+        
+        # Envoyer la mise à jour à tous les joueurs
+        emit('auction_vote_update', {
+            'player1_vote': game_info.get('player1_vote'),
+            'player2_vote': game_info.get('player2_vote'),
+            'conflict': conflict
+        }, room=game_id)
+        
+    except Exception as e:
+        print(f"❌ Erreur auction_vote: {e}")
+        import traceback
+        traceback.print_exc()
+        emit('error', {'message': 'Erreur lors du vote'})
+
+@socketio.on('auction_bid')
+def handle_auction_bid(data):
+    try:
+        game_id = data.get('game_id')
+        bid_time = data.get('time')
+        user_id = session.get('user_id')
+        
+        if not game_id or bid_time is None or not user_id:
+            emit('error', {'message': 'Données manquantes'})
+            return
+        
+        if not hasattr(app, 'pending_games') or game_id not in app.pending_games:
+            emit('error', {'message': 'Partie introuvable'})
+            return
+        
+        game_info = app.pending_games[game_id]
+        
+        from backend.db_models import User
+        user = User.query.get(user_id)
+        
+        # Enregistrer l'enchère
+        is_challenger = user_id == game_info['challenger_id']
+        if is_challenger:
+            game_info['player1_bid'] = bid_time
+        else:
+            game_info['player2_bid'] = bid_time
+        
+        # Envoyer la mise à jour
+        emit('auction_bid_update', {
+            'bidder_id': user_id,
+            'bidder_name': user.username,
+            'bid_time': bid_time
+        }, room=game_id)
+        
+    except Exception as e:
+        print(f"❌ Erreur auction_bid: {e}")
+        import traceback
+        traceback.print_exc()
+        emit('error', {'message': 'Erreur lors de l\'enchère'})
+
+@socketio.on('auction_resolve')
+def handle_auction_resolve(data):
+    try:
+        game_id = data.get('game_id')
+        
+        if not game_id:
+            emit('error', {'message': 'game_id requis'})
+            return
+        
+        if not hasattr(app, 'pending_games') or game_id not in app.pending_games:
+            emit('error', {'message': 'Partie introuvable'})
+            return
+        
+        game_info = app.pending_games[game_id]
+        
+        # Déterminer les couleurs
+        player1_vote = game_info.get('player1_vote')
+        player2_vote = game_info.get('player2_vote')
+        player1_bid = game_info.get('player1_bid')
+        player2_bid = game_info.get('player2_bid')
+        
+        # Si pas de conflit, attribuer selon les votes
+        if player1_vote and player2_vote and player1_vote != player2_vote:
+            game_info['challenger_color'] = player1_vote
+            game_info['accepter_color'] = 'black' if player1_vote == 'white' else 'white'
+        # Si conflit et enchères, le plus bas gagne
+        elif player1_bid is not None or player2_bid is not None:
+            if player1_bid is None:
+                winner_is_player1 = False
+                winner_time = player2_bid
+            elif player2_bid is None:
+                winner_is_player1 = True
+                winner_time = player1_bid
+            else:
+                winner_is_player1 = player1_bid < player2_bid
+                winner_time = min(player1_bid, player2_bid)
+            
+            winner_color = player1_vote if player1_vote else 'white'
+            
+            if winner_is_player1:
+                game_info['challenger_color'] = winner_color
+                game_info['accepter_color'] = 'black' if winner_color == 'white' else 'white'
+                # Le gagnant joue avec moins de temps
+                if winner_color == 'white':
+                    game_info['white_time'] = winner_time
+                else:
+                    game_info['black_time'] = winner_time
+            else:
+                game_info['accepter_color'] = winner_color
+                game_info['challenger_color'] = 'black' if winner_color == 'white' else 'white'
+                if winner_color == 'white':
+                    game_info['white_time'] = winner_time
+                else:
+                    game_info['black_time'] = winner_time
+        # Par défaut, couleurs aléatoires
+        else:
+            colors = ['white', 'black']
+            game_info['challenger_color'] = random.choice(colors)
+            game_info['accepter_color'] = 'black' if game_info['challenger_color'] == 'white' else 'white'
+        
+        # Initialiser les temps si pas définis
+        if 'white_time' not in game_info:
+            game_info['white_time'] = game_info['time_control']['minutes'] * 60
+        if 'black_time' not in game_info:
+            game_info['black_time'] = game_info['time_control']['minutes'] * 60
+        
+        # Envoyer la résolution
+        emit('auction_resolved', {
+            'game_id': game_id,
+            'challenger_id': game_info['challenger_id'],
+            'accepter_id': game_info['accepter_id'],
+            'challenger_name': game_info['challenger_name'],
+            'accepter_name': game_info['accepter_name'],
+            'challenger_color': game_info['challenger_color'],
+            'accepter_color': game_info['accepter_color'],
+            'fen': game_info['fen'],
+            'white_time': game_info['white_time'],
+            'black_time': game_info['black_time'],
+            'time_control': game_info['time_control']
+        }, room=game_id)
+        
+    except Exception as e:
+        print(f"❌ Erreur auction_resolve: {e}")
+        import traceback
+        traceback.print_exc()
+        emit('error', {'message': 'Erreur lors de la résolution'})
+
 # ========================================
 # GESTION D'ERREURS
 # ========================================
