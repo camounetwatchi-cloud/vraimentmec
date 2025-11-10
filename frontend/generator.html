@@ -487,6 +487,16 @@ header {
     z-index: 3;
 }
 
+/* Amélioration du conteneur de range */
+.range-container {
+    position: relative;
+    padding: 15px 10px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin: 8px 0;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
 .range-slider::-webkit-slider-runnable-track {
     background: transparent;
 }
@@ -583,13 +593,13 @@ header {
     transition: all 0.3s;
 }
 
-/* Range sliders avec double curseur visible */
 .range-slider {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
     height: 8px;
-    background: transparent;
+    background: linear-gradient(to right, #e0e0e0 0%, #667eea 50%, #e0e0e0 100%);
+    border-radius: 5px;
     outline: none;
     position: absolute;
     pointer-events: none;
@@ -606,7 +616,7 @@ header {
     pointer-events: all;
     transition: all 0.3s;
     border: 3px solid white;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .range-slider::-moz-range-thumb {
@@ -618,17 +628,19 @@ header {
     border: 3px solid white;
     pointer-events: all;
     transition: all 0.3s;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .range-slider::-webkit-slider-thumb:hover {
     background: #5568d3;
     transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
 }
 
 .range-slider::-moz-range-thumb:hover {
     background: #5568d3;
     transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
 }
 
 /* Différenciation visuelle des deux curseurs */
