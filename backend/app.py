@@ -430,7 +430,7 @@ def handle_join_game(data):
         
         print(f"✅ {user_id} connecté avec SID {request.sid} pour la partie {game_id}")
         # Rejoindre la room pour recevoir les événements d'enchères
-join_room(game_id, sid=request.sid)
+        join_room(game_id, sid=request.sid)
         
         # Si les deux joueurs sont connectés, créer l'objet Game
         if len(game_info['sids']) == 2:
