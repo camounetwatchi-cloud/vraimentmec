@@ -1644,9 +1644,8 @@ socket.on('challenge_accepted', (data) => {
                 console.log('❌ Joueur hors ligne:', data.username);
                 loadOnlinePlayers();
             });
-        }
 
-        socket.on('auction_vote_update', (data) => {
+            socket.on('auction_vote_update', (data) => {
     console.log('📊 Vote reçu:', data);
     
     if (data.player1_vote) {
@@ -1712,6 +1711,9 @@ socket.on('auction_resolved', (data) => {
         }
     });
 });
+        }
+
+        
 
 
         function startGame(data) {
