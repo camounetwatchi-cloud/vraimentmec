@@ -1149,11 +1149,8 @@ def accept_challenge(challenge_id):
         if not hasattr(app, 'pending_games'):
             app.pending_games = {}
         app.pending_games[game_id] = game_info
-
-        # Faire rejoindre les deux joueurs à la room pour les enchères
-from flask_socketio import join_room
-# Note: on ne peut pas utiliser join_room ici car on n'a pas les SID
-# Les joueurs rejoindront la room via join_game
+        
+        # Note: Les joueurs rejoindront la room via join_game car on n'a pas les SID ici
         
         print(f"✅ Partie créée en attente: {game_id}")
         print(f"   {challenger.username} ({challenger_color}) vs {user.username} ({accepter_color})")
