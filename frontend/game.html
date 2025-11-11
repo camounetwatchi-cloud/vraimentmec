@@ -51,6 +51,19 @@
     animation: pulse 1s infinite;
 }
 
+#colorAuctionModal .modal-content {
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+#colorAuctionModal .chessboard {
+    width: 300px !important;
+    height: 300px !important;
+    margin: 0 auto;
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
@@ -346,13 +359,15 @@
     }
 
     .modal-content {
-        background: white;
-        padding: 40px;
-        border-radius: 20px;
-        text-align: center;
-        max-width: 500px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    }
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 500px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-height: 90vh;
+    overflow-y: auto;
+}
 
     .modal-content h2 {
         color: #667eea;
@@ -2108,6 +2123,24 @@ function renderAuctionBoard(fen) {
     try {
         const game = new Chess(fen);
         const boardArray = game.board();
+        
+        // Créer un conteneur parent pour la position
+        const container = chessboard.parentElement;
+        
+        // Supprimer l'ancien indicateur de tour s'il existe
+        const oldTurnIndicator = container.querySelector('.auction-turn-indicator');
+        if (oldTurnIndicator) {
+            oldTurnIndicator.remove();
+        }
+        
+        // Créer l'indicateur de tour
+        const turnIndicator = document.createElement('div');
+        turnIndicator.className = 'auction-turn-indicator';
+        turnIndicator.style.cssText = 'text-align: center; font-weight: 600; margin-bottom: 10px; font-size: 1.1em; color: #667eea;';
+        turnIndicator.textContent = game.turn() === 'w' ? 'WHITE to move' : 'BLACK to move';
+        
+        // Insérer avant l'échiquier
+        container.insertBefore(turnIndicator, chessboard);
         
         for (let row = 0; row < 8; row++) {
             for (let col = 0; col < 8; col++) {
