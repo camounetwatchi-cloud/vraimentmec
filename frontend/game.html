@@ -1062,9 +1062,10 @@
     setInterval(loadChallenges, 3000);
 });
 
-        window.addEventListener('beforeunload', async () => {
-            await setPlayerOffline();
-        });
+        window.addEventListener('beforeunload', () => {
+    // Appel synchrone sans attendre la réponse
+    navigator.sendBeacon(`${API_URL}/api/players/set-offline`, '');
+});
 
         // Fonctions du modal de création de défi
         function openChallengeModal() {
