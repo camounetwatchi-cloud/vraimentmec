@@ -661,7 +661,6 @@ def handle_accept_draw(data):
     except Exception as e:
         print(f"❌ Erreur dans accept_draw: {e}")
         emit('error', {'message': 'Erreur lors de l\'acceptation de la nulle'})
-
 @socketio.on('auction_vote')
 def handle_auction_vote(data):
     try:
@@ -691,12 +690,14 @@ def handle_auction_vote(data):
         if 'player1_vote' in game_info and 'player2_vote' in game_info:
             conflict = game_info['player1_vote'] == game_info['player2_vote']
         
-        # Envoyer la mise à jour à tous les joueurs
-        emit('auction_vote_update', {
+        # IMPORTANT : Envoyer à TOUS les joueurs de la room (pas juste celui qui vote)
+        socketio.emit('auction_vote_update', {
             'player1_vote': game_info.get('player1_vote'),
             'player2_vote': game_info.get('player2_vote'),
             'conflict': conflict
         }, room=game_id)
+        
+        print(f"📊 Vote enregistré - Player1: {game_info.get('player1_vote')}, Player2: {game_info.get('player2_vote')}, Conflit: {conflict}")
         
     except Exception as e:
         print(f"❌ Erreur auction_vote: {e}")
