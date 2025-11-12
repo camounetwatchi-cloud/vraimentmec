@@ -1647,8 +1647,9 @@ socket.on('challenge_accepted', (data) => {
             });
 
             socket.on('auction_vote_update', (data) => {
-    console.log('📊 Vote reçu:', data);
+    console.log('📊 Vote reçu du serveur:', data);
     
+    // Mettre à jour l'affichage du joueur 1
     if (data.player1_vote) {
         document.getElementById('auctionPlayer1Vote').textContent = 
             data.player1_vote === 'white' ? '⚪ Blanc' : '⚫ Noir';
@@ -1657,6 +1658,7 @@ socket.on('challenge_accepted', (data) => {
         auctionData.player1Vote = data.player1_vote;
     }
     
+    // Mettre à jour l'affichage du joueur 2
     if (data.player2_vote) {
         document.getElementById('auctionPlayer2Vote').textContent = 
             data.player2_vote === 'white' ? '⚪ Blanc' : '⚫ Noir';
@@ -1665,6 +1667,7 @@ socket.on('challenge_accepted', (data) => {
         auctionData.player2Vote = data.player2_vote;
     }
     
+    // Si conflit, afficher la section d'enchères
     if (data.conflict) {
         document.getElementById('colorSelectionSection').style.display = 'none';
         document.getElementById('auctionBidSection').style.display = 'block';
@@ -2190,13 +2193,12 @@ function voteForColor(color) {
         color: color
     });
     
-    // Mettre à jour l'affichage local
-    updateLocalVote(color);
-    
     // Désactiver les boutons après le vote
     document.getElementById('colorSelectionSection').querySelectorAll('button').forEach(btn => {
         btn.disabled = true;
     });
+    
+    console.log('✅ Vote envoyé:', color);
 }
 
 function updateLocalVote(color) {
