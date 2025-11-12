@@ -2192,6 +2192,11 @@ function voteForColor(color) {
     
     // Mettre à jour l'affichage local
     updateLocalVote(color);
+    
+    // Désactiver les boutons après le vote
+    document.getElementById('colorSelectionSection').querySelectorAll('button').forEach(btn => {
+        btn.disabled = true;
+    });
 }
 
 function updateLocalVote(color) {
@@ -2207,6 +2212,8 @@ function updateLocalVote(color) {
     } else {
         auctionData.player2Vote = color;
     }
+    
+    console.log('✅ Vote local enregistré:', color);
 }
 
 function placeBid() {
